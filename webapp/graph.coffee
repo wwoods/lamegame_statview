@@ -64,12 +64,13 @@ define [ 'cs!lib/ui.base', 'cs!stat', 'cs!controls' ], (UiBase, Stat, Controls) 
             groupFiltersBase = self._statsController.groups
 
             groupFilters = {}
-            for group of groups
+            for group in groups
                 baseValues = groupFiltersBase[group[0]]
                 if group[1] != null
                     groupValues = []
                     groupFilters[group[0]] = groupValues
-                    # group[1] is a regex that tells us to include a certain value
+                    # group[1] is a regex that tells us to include a certain
+                    # value
                     for j of baseValues
                         if group[1].test(j)
                             groupValues.push(j)
@@ -77,8 +78,7 @@ define [ 'cs!lib/ui.base', 'cs!stat', 'cs!controls' ], (UiBase, Stat, Controls) 
                     groupFilters[group[0]] = baseValues
 
             # We don't support * syntax outbound; fill in all possible values
-            console.log(stat.groups)
-            console.log(groupFilters)
+            # that aren't already specified
             for group in stat.groups
                 if not (group of groupFilters)
                     groups.push([ group ])
