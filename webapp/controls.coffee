@@ -80,22 +80,10 @@ define [ 'cs!lib/ui.base', 'cs!lib/ui/listbox' ], (UiBase, ListBox) ->
                         filter = new RegExp(filter)
                     groups.push [$(this).text(), filter]
 
-                smoothOver = parseFloat(smoother.val()) or 0
-                smoothOver = smoothOver * 60 * 60
+                smoothOver = @parseInterval(smoother.val())
                 expectedVal = eval(expected.val()) or 0
-                timeAmt = timeDivAmt.val()
-                timeFrom = new Date().getTime() / 1000
-                if timeAmt is ""
-                    timeFrom -= 12 * 24 * 60 * 60
-                else if /d(y|ay)?s?$/.test(timeAmt)
-                    #Days
-                    timeFrom -= parseFloat(timeAmt) * 24 * 60 * 60
-                else if /m(in|inute)?s?$/.test(timeAmt)
-                    #Minutes
-                    timeFrom -= parseFloat(timeAmt) * 60
-                else
-                    #Hours
-                    timeFrom -= parseFloat(timeAmt) * 60 * 60
+                timeAmt = @parseInterval(timeDivAmt.val(), '12 days')
+                timeFrom = new Date().getTime() / 1000 - timeAmt
                 options =
                     stat: stat
                     groups: groups
@@ -105,5 +93,19 @@ define [ 'cs!lib/ui.base', 'cs!lib/ui/listbox' ], (UiBase, ListBox) ->
                     autoRefresh: 300
 
                 @_graph.update options
+
+        parseInterval: (interval, def = 0) ->
+            if interval == ""
+                interval = def
+
+            if /d(y|ay)?s?$/.test(interval)
+                #Days
+                return parseFloat(interval) * 24 * 60 * 60
+            else if /m(in|inute)?s?$/.test(interval)
+                #Minutes
+                return parseFloat(interval) * 60
+            else
+                #Hours
+                return parseFloat(interval) * 60 * 60
 
 
