@@ -257,14 +257,16 @@ define [ 'cs!lib/ui.base', 'cs!stat', 'cs!controls' ], (UiBase, Stat, Controls) 
 
                 # Now, add!
                 if stat.type == 'count'
-                    value = movingTotal
-                    if self._config.expectedPerGroup > 0
-                        # If we have an expected amount, and we're not an average,
-                        # then we'll need to scale according to expected time
-                        # value
-                        value = value * origSmooth / smoothSecs
-                    values.push(value)
+                    # For counts, if we wanted a smaller time range than
+                    # the smoothing interval, we'll need to scale it down
+                    if origSmooth != 0
+                        values.push(movingTotal * origSmooth / smoothSecs)
+                    else
+                        # We want to use data density
+                        values.push(movingTotal)
                 else if stat.type == 'total'
+                    # These are set values, so adjust smoothing according to
+                    # the srcInterval
                     values.push(movingTotal * srcInterval / smoothSecs)
                 else
                     throw "Stat type summation not defined: " + stat.type
