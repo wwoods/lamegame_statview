@@ -1,6 +1,7 @@
 define [ 'cs!lib/ui.base', 'cs!lib/ui/listbox' ], (UiBase, ListBox) ->
     class Controls extends UiBase
         constructor: (graph) ->
+            self = @
             super('<div class="controls"></div>')
 
             @_graph = graph
@@ -73,7 +74,7 @@ define [ 'cs!lib/ui.base', 'cs!lib/ui/listbox' ], (UiBase, ListBox) ->
                 stat = @_statsController.stats[lb.val()]
                 groups = []
                 groupsActive.children().each ->
-                    filter = $(".regex", $(this)).val()
+                    filter = $(".regex", $(self)).val()
                     if filter is ""
                         filter = null
                     else
@@ -87,6 +88,9 @@ define [ 'cs!lib/ui.base', 'cs!lib/ui/listbox' ], (UiBase, ListBox) ->
                 timeFrom = new Date().getTime() / 1000
                 if timeAmt is ""
                     timeFrom -= 12 * 24 * 60 * 60
+                else if /y(ea)?rs?$/.test(timeAmt)
+                    # Years
+                    timeFrom -= parseFloat(timeAmt) * 365 * 24 * 60 * 60
                 else if /d(y|ay)?s?$/.test(timeAmt)
                     #Days
                     timeFrom -= parseFloat(timeAmt) * 24 * 60 * 60
