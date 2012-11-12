@@ -192,6 +192,21 @@ module = (ui, Stat, Controls) ->
             result = { stat: matchStat, groups: matchGroups }
             values = []
             result.values = values
+            
+            # First thing's first - if we're a total, we need to replace all
+            # 'None' values with the last value.  If we're a count, just
+            # replace all 'None' values with 0.
+            if stat.type == 'total'
+                lastValue = 0;
+                for i in [4...rawData.length]
+                    if rawData[i] != 'None'
+                        lastValue = rawData[i]
+                    else
+                        rawData[i] = lastValue
+            else if stat.type == 'count'
+                for i in [4...rawData.length]
+                    if rawData[i] == 'None'
+                        rawData[i] = 0
 
             firstTime = timeFrom
             # Don't add any post-smoothing points before timeFrom, since for
@@ -247,16 +262,14 @@ module = (ui, Stat, Controls) ->
                             movingTime = newTail
                         else
                             # Remove the whole value
-                            if rawData[movingIndex] != 'None'
-                                movingTotal -= parseFloat(rawData[movingIndex])
+                            movingTotal -= parseFloat(rawData[movingIndex])
                             movingTime = movingTimeBase + srcInterval
                             movingTimeBase = movingTime
                             movingIndex += 1
                     else if stat.type == 'total'
                         if timeLeft >= partLeft
                             # Take off the whole rest of the point
-                            if rawData[movingIndex] != 'None'
-                                movingTotal -= (
+                            movingTotal -= (
                                     parseFloat(rawData[movingIndex]) *
                                     partLeft / srcInterval)
                             movingTime = movingTimeBase + srcInterval
@@ -264,10 +277,9 @@ module = (ui, Stat, Controls) ->
                             movingIndex += 1
                         else
                             # Take off part of the point and we're done
-                            if rawData[movingIndex] != 'None'
-                                movingTotal -= (
-                                        parseFloat(rawData[movingIndex]) *
-                                        timeLeft / srcInterval)
+                            movingTotal -= (
+                                    parseFloat(rawData[movingIndex]) *
+                                    timeLeft / srcInterval)
                             movingTime = newTail
 
                 while srcIndex < rawData.length and srcTime < pointTime
@@ -279,8 +291,7 @@ module = (ui, Stat, Controls) ->
                         # We want the first instance to count for everything
                         if srcTime == srcTimeBase
                             # We're at first point, add it
-                            if rawData[srcIndex] != 'None'
-                                movingTotal += parseFloat(rawData[srcIndex])
+                            movingTotal += parseFloat(rawData[srcIndex])
 
                         # Are we going to a new point?
                         if timeLeft >= partLeft
@@ -292,18 +303,16 @@ module = (ui, Stat, Controls) ->
                     else if stat.type == 'total'
                         if timeLeft >= partLeft
                             # Rest of the point!
-                            if rawData[srcIndex] != 'None'
-                                movingTotal += (
-                                        parseFloat(rawData[srcIndex]) *
-                                        partLeft / srcInterval)
+                            movingTotal += (
+                                    parseFloat(rawData[srcIndex]) *
+                                    partLeft / srcInterval)
                             srcTime = srcTimeBase + srcInterval
                             srcTimeBase = srcTime
                             srcIndex += 1
                         else
                             # Partial point and done
-                            if rawData[srcIndex] != 'None'
-                                movingTotal += (parseFloat(rawData[srcIndex]) *
-                                        timeLeft / srcInterval)
+                            movingTotal += (parseFloat(rawData[srcIndex]) *
+                                    timeLeft / srcInterval)
                             srcTime = pointTime
 
                 # Now, add!
@@ -494,6 +503,9 @@ module = (ui, Stat, Controls) ->
             # 30 days?
             if (xmax - xmin) / intervalLength > 20
                 intervalLength *= 6
+            # 90 days?
+            if (xmax - xmin) / intervalLength > 20
+                intervalLength *= 3
 
             # Now that we have "optimal" length, align to nearest whole time unit
             intervalShift = 0
@@ -539,6 +551,11 @@ module = (ui, Stat, Controls) ->
             while intervalMax > xmin
                 d = new Date()
                 d.setTime(intervalMax * 1000)
+                
+                # Daylight savings fun!!!
+                if intervalLength > 23.9 * 60 * 60 and d.getHours() != 0
+                    intervalMax -= d.getHours() * 60 * 60
+                    d.setTime(intervalMax * 1000)
 
                 if d.getHours() == 0 and d.getMinutes() == 0
                     # Month : day timestamps
