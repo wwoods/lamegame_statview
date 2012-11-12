@@ -35,7 +35,7 @@ callback = (ui, StatsController, Dashboard) ->
         changeDash: () ->
             # Called when @picker changes
             newVal = @picker.val()
-            if newVal == '(unsaved)'
+            if newVal == '(unsaved)' or newVal == @namer.val()
                 # No action
                 return
 
