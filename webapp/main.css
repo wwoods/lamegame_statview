@@ -1,35 +1,3 @@
 body {
     background-color: #fff;
 }
-
-.display {
-    width: 100%;
-    height: 100%;
-    position: absolute;
-}
-.overtop {
-    position: absolute;
-    left: 200px;
-    top: 0;
-    color: #000;
-    background-color: #fff;
-}
-.graph {
-    width: 100%;
-    height: 100%;
-    position: absolute;
-}
-.controls {
-    width: 200px;
-    position: absolute;
-    left: 0;
-    top: 0;
-}
-.controls-collapse {
-    width: 100%;
-    height: 1.2em;
-    background-color: #efefff;
-    font-size: 0.8em;
-    cursor: pointer;
-}
-

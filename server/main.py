@@ -1,6 +1,7 @@
 
 import cherrypy
 import json
+import re
 import os
 import time
 
@@ -32,13 +33,39 @@ class MainRoot(object):
     src = StaticServer(_DIR + '/webapp')
 
     def __init__(self):
-        t = cherrypy.app['source']['type'].lower()
+        ss = cherrypy.app['source']
+        if ss.get('use') is not None:
+            ss = cherrypy.app[ss['use']]
+        self._sourceConfig = ss
+        t = ss['type'].lower()
         if t == 'lgtask':
-            self._source = lgTaskSource.LgTaskSource(cherrypy.app['source'])
+            self._source = lgTaskSource.LgTaskSource(ss)
         elif t == 'graphite':
-            self._source = graphiteSource.GraphiteSource(cherrypy.app['source'])
+            self._source = graphiteSource.GraphiteSource(ss)
         else:
             raise ValueError("Unknown source type " + t)
+
+        # Do we have storage?
+        if 'storage' in cherrypy.app:
+            url = cherrypy.app['storage']['dashboards']
+            if url.startswith('pymongo://'):
+                m = re.match("^pymongo://([^:@]+(:[^@]+)?@)?([^/]+)(:[^/]+)?(/[^/]+)?(/[^/]+)?$", url)
+                if m is None:
+                    raise ValueError("Invalid pymongo url: " + url)
+                user, pwd, host, port, db, coll = m.groups()
+                if coll is None:
+                    raise ValueError("Storage needs collection")
+                # Import so pymongo isn't required; storage is not necessary
+                # to run the app
+                import pymongo
+                self._storage = pymongo.Connection(host = host, port = port,
+                        auto_start_request = False)
+                # 1: strips leading slash
+                self._storage = self._storage[db[1:]][coll[1:]]
+            else:
+                raise ValueError("Unknown 'dashboards' URL: " + url)
+        else:
+            self._storage = None
 
 
     @cherrypy.expose
@@ -64,12 +91,40 @@ class MainRoot(object):
 
     @cherrypy.expose
     @cherrypy.config(**{ 'response.headers.Content-Type': 'application/json' })
-    def getStats(self):
-        """Returns a JSON blob about available stats.
+    def getStartup(self):
+        """Returns a JSON blob about available stats and dashboards
         """
         stats = self._source.getStats()
         return json.dumps({
             'stats': stats
-            , 'paths': cherrypy.app['source']['paths'] 
+            , 'paths': self._sourceConfig['paths'] 
+            , 'dashboards': self._getDashboards()
         })
+
+
+    @cherrypy.expose
+    @cherrypy.config(**{ 'response.headers.Content-Type': 'application/json' })
+    def saveDashboard(self, dashDef):
+        if self._storage is None:
+            return json.dumps(dict(error = "Can't save without storage"))
+
+        dd = json.loads(dashDef)
+        if 'id' not in dd:
+            raise ValueError("id not found")
+        dd['_id'] = dd['id']
+        del dd['id']
+        self._storage.save(dd)
+        return json.dumps(dict(ok = True))
+
+
+    def _getDashboards(self):
+        """Return all dashboards as a list"""
+        if self._storage is None:
+            return []
+        # LOAD EVERYTHING!
+        docs = list(self._storage.find())
+        for d in docs:
+            d['id'] = d['_id']
+            del d['_id']
+        return docs
 

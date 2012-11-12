@@ -23,11 +23,11 @@ define [], () ->
             # Return a regex that matches the given path
             findGroup = /{([^}]*)}/g
             reString = (
-                    '^' + path.replace('.', '\\.')
+                    '^' + path.replace(/\./g, '\\.')
                             .replace(findGroup, '([^\\.]*)')
             )
             if isDir
-                reString += '\\.[^\\.]*'
+                reString += '\\.[^\\.]*$'
             else
                 reString += '$'
             return new RegExp(reString, 'g')

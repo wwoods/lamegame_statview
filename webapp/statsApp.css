@@ -1,0 +1,23 @@
+.stats-header {
+    position: relative;
+    height: 2em;
+    background-color: #eee;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 2px;
+    margin-top: 8px;
+}
+
+.stats-dash-picker {
+    margin-top: 
+}
+
+.stats-header-button {
+    padding: 0.25em;
+    margin: 0.25em;
+    background-color: #fff;
+    border-color: #444;
+    color: #000;
+    display: inline-block;
+    cursor: pointer;
+}
+

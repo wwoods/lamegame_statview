@@ -1,109 +1,169 @@
-define [ 'cs!lib/ui.base', 'cs!stat', 'cs!controls' ], (UiBase, Stat, Controls) ->
-    class Graph extends UiBase
+reqs = [ 'cs!lib/ui', 'cs!stat', 'cs!controls', 'css!graph' ]
+module = (ui, Stat, Controls) ->
+    class Graph extends ui.Base
         constructor: (config) ->
             super('<div class="graph"></div>')
             self = this
-            self._statsController = UiBase.fromDom('.stats-app')._statsController
+            self._statsController = ui.Base.fromDom('.stats-app')._statsController
 
-            self._display = $('<div class="display"></div>').appendTo(self)
-            self._controls = new Controls(self).appendTo(self)
-            self._overlay = $('<div class="overlay"></div>').appendTo(self)
+            self._display = $('<div class="graph-display"></div>').appendTo(
+                    self)
 
-            self._config =
-                stat: null
+            self.config =
+                expr: ''
+                # List of (groupName, filterRegex) to break down results. 
+                # filterRegex is the text, and may be empty string for none
                 groups: []
-                # Seconds to sum data over for each point
-                smoothOver: 0
-                # If non-zero, expected value (with smoothOver) at each point
-                expectedPerGroup: 0
-                # Epoch time (seconds)
-                timeFrom: 0
-                timeTo: 'now'
-                # Seconds between auto refresh
-                autoRefresh: 0
+                # Time to sum data over for each point (expression passed
+                # to parseInterval)
+                smoothOver: ''
+                # Expression (passed to parseInterval).  Use blank string to
+                # use dashboard value
+                timeAmt: ''
+                # String relating time to start or empty for dashboard
+                timeBasis: ''
+                # Seconds between auto refresh, or '' to use dashboard
+                autoRefresh: ''
                 # Points to display on the graph
                 graphPoints: 300
+            if config
+                $.extend(self.config, config)
             self._autoRefreshTimeout = null
             self._authRefreshNext = null
-            self.update(config)
+
+            expanded = not config?
+            self._controls = new Controls(self, expanded).appendTo(self)
+            self._overlay = $('<div class="graph-overlay"></div>').appendTo(
+                    self)
+
+            # Render once we're attached to dashboard
+            ui.setZeroTimeout () =>
+                self.update()
+
+
+        parseInterval: (interval, defaultInterval = 60*60) ->
+            if interval == ''
+                return 0
+
+            if /d(y|ay)?s?$/.test(interval)
+                #Days
+                return parseFloat(interval) * 24 * 60 * 60
+            else if /m(in|inute)?s?$/.test(interval)
+                #Minutes
+                return parseFloat(interval) * 60
+            else if /h(ou)?r?s?$/.test(interval)
+                # Hours
+                return parseFloat(interval) * 60 * 60
+            else
+                # default
+                return parseFloat(interval) * defaultInterval
+
+
+        parseStats: (expr) ->
+            ### Parse an expression for stats, return array of stats used
+            ###
+            statsFound = []
+            findStat = /[a-zA-Z0-9_.-]+/g
+            while (next = findStat.exec(expr)) != null
+                stat = @_statsController.stats[next[0]]
+                if not stat
+                    continue
+
+                statsFound.push(stat)
+            return statsFound
 
 
         update: (configChanges) ->
             self = this
             if configChanges
-                $.extend(self._config, configChanges)
+                $.extend(self.config, configChanges)
             
             # Clear out old autorefresh
             if self._autoRefreshTimeout != null
                 clearTimeout(self._autoRefreshTimeout)
                 self._autoRefreshTimeout = null
 
-            if self._config.stat == null
+            if self.config.expr == null or self.config.expr == ''
+                self._display.empty()
                 self._overlay.empty().append(
-                    '<div class="overtop">No data selected</div>'
+                    '<div>No data selected</div>'
                 )
                 return
 
             self._overlay.empty().append(
-                '<div class="overtop">Loading data, please wait</div>'
+                '<div>Loading data, please wait</div>'
             )
 
             # Set new autorefresh
-            if self._config.autoRefresh > 0
+            if self.config.autoRefresh > 0
                 self._autoRefreshNext = (new Date().getTime() / 1000)
-                self._autoRefreshNext += self._config.autoRefresh
+                self._autoRefreshNext += self.config.autoRefresh
             else
                 self._autoRefreshNext = null
 
-            stat = self._config.stat
-            if not (stat instanceof Stat)
-                stat = self._statsController.stats[stat]
+            stats = self.parseStats(self.config.expr)
 
-            targets = []
-            groups = $.extend([], self._config.groups)
+            # Copy the groups array
+            groups = self.config.groups[..]
             groupFiltersBase = self._statsController.groups
 
             groupFilters = {}
             for group in groups
                 baseValues = groupFiltersBase[group[0]]
-                if group[1] != null
+                if group[1] != ''
+                    regex = new RegExp(group[1])
                     groupValues = []
                     groupFilters[group[0]] = groupValues
-                    # group[1] is a regex that tells us to include a certain
-                    # value
                     for j of baseValues
-                        if group[1].test(j)
+                        if regex.test(j)
                             groupValues.push(j)
                 else
                     groupFilters[group[0]] = baseValues
 
+            # Get all groups from all stats
+            allGroups = {}
+            for stat in stats
+                for group in stat.groups
+                    allGroups[group] = true
+
             # We don't support * syntax outbound; fill in all possible values
             # that aren't already specified
-            for group in stat.groups
+            for group of allGroups
                 if not (group of groupFilters)
                     groups.push([ group ])
                     groupFilters[group] = groupFiltersBase[group]
 
-            self._iterateTargets(targets, stat, {}, groups, 0, groupFilters)
+            targetSet = {}
+            self._iterateTargets(targetSet, stats, {}, groups, 0, groupFilters)
+            targets = []
+            for t of targetSet
+                targets.push(t)
 
-            timeTo = self._config.timeTo
+            timeTo = self.config.timeBasis
+            if timeTo == ''
+                timeTo = ui.fromDom(@closest('.dashboard')).getTimeBasis()
             if timeTo == 'now'
                 timeTo = (new Date().getTime() / 1000)
+
+            timeAmt = self.config.timeAmt
+            if timeAmt == ''
+                timeAmt = ui.fromDom(@closest('.dashboard')).getTimeAmt()
+            timeFrom = timeTo - self.parseInterval(timeAmt)
 
             $.ajax('getData', {
                 type: 'POST'
                 data: {
                     targetListJson: JSON.stringify(targets)
-                    timeFrom: Math.floor(self._config.timeFrom - 
-                            self._config.smoothOver)
+                    timeFrom: Math.floor(timeFrom - self.parseInterval(
+                            self.config.smoothOver))
                     timeTo: Math.floor(timeTo)
                 }
-                success: (data) -> self._onLoaded(data, timeTo)
+                success: (data) -> self._onLoaded(data, timeFrom, timeTo, stats)
                 error: () -> self._overlay.text('Failed to load')
             })
 
 
-        _aggregateSourceData: (rawData, pointTimes) ->
+        _aggregateSourceData: (rawData, pointTimes, timeFrom) ->
             # Searches our statsController's stats for the stat matching
             # rawLine, and aggregates it appropriately according to the stat
             # type
@@ -133,7 +193,7 @@ define [ 'cs!lib/ui.base', 'cs!stat', 'cs!controls' ], (UiBase, Stat, Controls) 
             values = []
             result.values = values
 
-            firstTime = self._config.timeFrom
+            firstTime = timeFrom
             # Don't add any post-smoothing points before timeFrom, since for
             # smoothing we had to request more data than we needed.
             # Note that srcIndex and srcTime are actually the index of the NEXT
@@ -146,9 +206,9 @@ define [ 'cs!lib/ui.base', 'cs!stat', 'cs!controls' ], (UiBase, Stat, Controls) 
             # Note that philosophically we consider the time in each pointTimes
             # record to be from immediately after the last point time up to and
             # including the next pointTime.
-            smoothSecs = self._config.smoothOver
-            # Keep track of originally requested smoothing for summations with
-            # expected values
+            smoothSecs = self.parseInterval(self.config.smoothOver)
+            # Keep track of originally requested smoothing so that constants
+            # affect the post-aggregated result of equations
             origSmooth = smoothSecs
             if smoothSecs < srcInterval
                 # If no smoothing was specified, use the data density
@@ -173,7 +233,7 @@ define [ 'cs!lib/ui.base', 'cs!stat', 'cs!controls' ], (UiBase, Stat, Controls) 
                 # through dataTime + srcInterval, exclusive on the latter bound).
                 # By doing this, we avoid awkward discrete computations that
                 # can really cause errors in certain situations (e.g. those with
-                # expectedPerGroup or specific smoothing intervals)
+                # specific smoothing intervals)
                 newTail = pointTime - smoothSecs
                 while movingTime < newTail
                     # Take off of moving summation
@@ -266,31 +326,35 @@ define [ 'cs!lib/ui.base', 'cs!stat', 'cs!controls' ], (UiBase, Stat, Controls) 
             return result
 
 
-        _iterateTargets: (output, stat, statData, groups, groupIndex,
+        _iterateTargets: (outputs, stats, statData, groups, groupIndex,
                 groupValues) ->
             if groupIndex == groups.length
-                t = stat.getTarget(statData)
-                if t of @_statsController.allStats
-                    output.push(t)
+                for stat in stats
+                    t = stat.getTarget(statData)
+                    if t of @_statsController.allStats
+                        outputs[t] = true
                 return
 
             name = groups[groupIndex][0]
             values = groupValues[name]
             for value in values
                 statData[name] = value
-                this._iterateTargets(output, stat, statData, groups,
+                this._iterateTargets(outputs, stats, statData, groups,
                         groupIndex + 1, groupValues)
 
 
-        _onLoaded: (dataRaw, timeTo) ->
-            # timeTo is passed since it might be defined according to the request
+        _onLoaded: (dataRaw, timeFrom, timeTo, stats) ->
+            # timeTo is passed since it might be defined according to the 
+            # request (timeFrom as well).  stats passed to avoid re-parsing.
             self = this
             self._display.empty()
             self._overlay.empty()
 
-            # For drawing the graph, we explicitly don't use self._overlay, since 
-            # that gets overwritten if we need to auto-update as fast as we can.
-            loadedText = $('<div class="overtop">Loaded, drawing graph</div>')
+            # For drawing the graph, we explicitly don't use self._overlay, 
+            # since that gets overwritten if we need to auto-update as fast as 
+            # we can.
+            loadedText = $('<div class="graph-render-overlay">
+                    Loaded, drawing graph</div>')
             loadedText.appendTo(self._display)
 
             # Set up next autorefresh
@@ -325,17 +389,18 @@ define [ 'cs!lib/ui.base', 'cs!stat', 'cs!controls' ], (UiBase, Stat, Controls) 
             # with timestamps matching pointTimes
             pointTimes = []
             lastPoint = timeTo
-            pointDiff = ((timeTo - self._config.timeFrom) / 
-                    self._config.graphPoints)
-            for i in [0...self._config.graphPoints]
+            pointDiff = ((timeTo - timeFrom) / 
+                    self.config.graphPoints)
+            for i in [0...self.config.graphPoints]
                 pointTimes.unshift(lastPoint)
                 lastPoint -= pointDiff
 
             data = { values: {} }
             for dataSet in dataSetsRaw
-                dataSetData = self._aggregateSourceData(dataSet, pointTimes)
+                dataSetData = self._aggregateSourceData(dataSet, pointTimes,
+                        timeFrom)
                 dataSetName = dataSetData.stat.name
-                myGroups = self._config.groups.slice()
+                myGroups = self.config.groups.slice()
                 dataOutput = data
                 while true
                     # Merge at this level
@@ -360,27 +425,43 @@ define [ 'cs!lib/ui.base', 'cs!stat', 'cs!controls' ], (UiBase, Stat, Controls) 
                     dataOutput = dataOutput[nextValue]
             console.log(data)
 
+            # JS Sandbox
+            # Thanks to http://stackoverflow.com/questions/543533/restricting-eval-to-a-narrow-scope
+            maskedEval = (scr, ctx) ->
+                mask = {}
+                for p of this
+                    mask[p] = undefined
+                for p of ctx
+                    mask[p] = ctx[p]
+                (new Function("with(this) { return " + scr + "}")).call(mask)
+
             # ================== ADAPTER CODE ==================
             dataSets = []
             for groupVal of data
                 dataSet = data[groupVal]
                 if groupVal == 'values'
-                    if self._config.groups.length != 0
+                    if self.config.groups.length != 0
                         # We have data to display, don't include "values"
                         continue
                     dataSet = data
                 
-                values = dataSet.values[self._config.stat.name]
-                dataSets.push(values.map(
-                    (a, i) ->
-                        value = a
-                        if self._config.expectedPerGroup != 0
-                            value = Math.max(
-                                self._config.expectedPerGroup - value
-                                0
-                            )
-                        return { x: pointTimes[i], y: value, title: groupVal }
-                ))
+                s1 = stats[0].name
+                newValues = []
+                for j in [0...dataSet.values[s1].length]
+                    ctx = {}
+                    expr = self.config.expr
+                    for s, q in stats
+                        vals = dataSet.values[s.name]
+                        newName = 'v' + q
+                        ctx[newName] = vals[j]
+                        expr = expr.replace(s.name, newName)
+                    result = maskedEval(expr, ctx)
+                    newValues.push(
+                        x: pointTimes[j]
+                        y: result
+                        title: groupVal
+                    )
+                dataSets.push(newValues)
 
             #-------------- OLD (relevant) CODE -------------------
             display = self._display
@@ -524,17 +605,36 @@ define [ 'cs!lib/ui.base', 'cs!stat', 'cs!controls' ], (UiBase, Stat, Controls) 
             window.stack = stack
 
             onMouseOver = (d) ->
-                x = d3.mouse(this)[0]
+                x = d3.event.pageX
+                svgStart = $(this).closest('svg').offset().left
                 svgWidth = $(this).closest('svg').width()
-                idx = Math.floor(x * d.length / svgWidth)
-                console.log("OVER " + d[0].title + ", " + d[idx].y)
-            
+                # For interp, last point happens at far-right, first point
+                # happens at svgStart
+                interp = (d.length - 1) * (x - svgStart) / svgWidth
+                idx = Math.floor(interp)
+                idx2 = idx + 1
+                if idx2 < d.length
+                    u = interp - idx
+                    val = d[idx].y * (1 - u) + d[idx2].y * u
+                else
+                    val = d[idx].y
+                # Non-integers, change to precision if they're less than
+                # a certain amount.  Otherwise, make it by fixed.
+                valStr = val
+                if val != Math.floor(val)
+                    # Val is floating point
+                    if Math.abs(val) > 100
+                        valStr = val.toFixed(1)
+                    else
+                        valStr = val.toPrecision(4)
+                ui.Tooltip.show(d3.event, d[0].title + ", " + valStr)
+            onMouseOut = (d) ->
+                ui.Tooltip.hide()
+
             relativeToAll = false
 
             getAreaMethod = () ->
-                useYmax = dataSets.length * self._config.expectedPerGroup
-                if not relativeToAll
-                    useYmax = ymax
+                useYmax = ymax
                 area = d3.svg.area()
                     .x((d) -> (d.x - xmin) * width / (xmax - xmin))
                     .y0((d) -> height - d.y0 * height / useYmax)
@@ -542,21 +642,21 @@ define [ 'cs!lib/ui.base', 'cs!stat', 'cs!controls' ], (UiBase, Stat, Controls) 
                 return area
 
             # First render
-            color = d3.interpolateRgb("#aad", "#556")
+            color = d3.scale.category10()
+            # color = d3.interpolateRgb("#aad", "#556")
             vis.selectAll("path")
                 .data(stack).enter()
                     .append("path")
                     .style("fill", () -> color(Math.random()))
                     .attr("d", getAreaMethod())
                     .attr("title", (d, i) -> d[0].title)
-                    .on("mouseover", onMouseOver)
+                    .on("mousemove", onMouseOver)
+                    .on("mouseout", onMouseOut)
 
             # Remove loaded message
             loadedText.remove()
 
             redraw = () ->
-                if self._config.expectedPerGroup > 0
-                    relativeToAll = not relativeToAll
                 vis.selectAll("path")
                     .data(stack)
                     .transition()
@@ -565,4 +665,5 @@ define [ 'cs!lib/ui.base', 'cs!stat', 'cs!controls' ], (UiBase, Stat, Controls) 
 
             $('body').unbind('click').bind('click', () -> redraw())
 
+define(reqs, module)
 

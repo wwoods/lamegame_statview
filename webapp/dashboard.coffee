@@ -1,21 +1,107 @@
-define [ 'cs!lib/ui.base', 'cs!graph' ], (UiBase, Graph) ->
-    class Dashboard extends UiBase
+define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
+    class DashboardCell extends ui.Base
+        constructor: (child) ->
+            super('<div class="dashboard-cell"></div>')
+            @append(child)
+
+
+    class DashboardNew extends ui.Base
+        # Placeholder widget - click to add a graph
         constructor: () ->
+            super('<div class="graph dashboard-new"></div>')
+            @append('<table style="width:100%;height:100%;text-align:center">
+                    <tr>
+                      <td style="vertical-align:middle;">Add New...</td>
+                    </tr></table>')
+
+
+    class DashboardContainer extends ui.DragContainer
+        constructor: (definition) ->
+            super
+                root: '<div class="dashboard-container"></div>'
+                handleSelector: '.controls-collapse'
+
+            @columns = 2
+            @ratio = 0.618 # height / width
+
+            # Let us get added to dom, since we'll need a valid width
+            ui.setZeroTimeout () =>
+                @_createNew = new DashboardNew()
+                @_createNew.bind "click", () =>
+                    @append(new Graph())
+                @_createNew = @append(@_createNew)
+
+                if definition?
+                    for config in definition.graphs
+                        @append(new Graph(config))
+
+
+        append: (graph) ->
+            ### Creates a cell to contain the graph and adds it to our view.
+
+            Returns the new cell
+            ###
+            cell = new DashboardCell(graph)
+            @_resizeCell(cell)
+            # Window width can change on insert
+            oSize = $(window).width()
+            if graph instanceof Graph
+                @_createNew.before(cell)
+            else
+                # Create new placeholder
+                super(cell)
+            if oSize != $(window).width()
+                @resize()
+            return cell
+
+
+        resize: () ->
+            # Resize all graphs on window resize
+            for cell in @children()
+                @_resizeCell(ui.fromDom(cell))
+
+
+        _resizeCell: (cell) ->
+            w = @width() / @columns
+            cell.css
+                width: w
+                height: w * @ratio
+
+
+    class Dashboard extends ui.Base
+        constructor: (definition) ->
             super('<div class="dashboard"></div>')
-            t = $('<table></table>').appendTo(this)
-            this.empty()
-            r = $('<tr></tr>').appendTo(t)
-            s = ' style="position:relative;"'
-            w = $(window).width() * 0.5
-            c = $('<td' + s + '></td>').appendTo(r)
-            c.css('width', w + 'px')
-            c.css('height', w * 0.618 + 'px')
-            graph = new Graph()
-            c.append(graph)
-            c = $('<td' + s + '></td>').appendTo(r)
-            c.css('width', w + 'px')
-            c.css('height', w * 0.618 + 'px')
-            graph2 = new Graph()
-            c.append(graph2)
-            this.append(graph)
+
+            @container = new DashboardContainer(definition).appendTo(@)
+
+            $(window).resize () =>
+                @container.resize()
+
+
+        changeColumns: (i) ->
+            @container.columns += i
+            if @container.columns < 1
+                @container.columns = 1
+            @container.resize()
+
+
+        getDefinition: () ->
+            # Get the definition of this dashboard to save out
+            result =
+                graphs: []
+            for g in @container.children()
+                # Look at second-level child, since first is "cell" object
+                g = ui.fromDom($(g).children())
+                if not (g instanceof Graph)
+                    continue
+                result.graphs.push($.extend({}, g.config))
+            return result
+
+
+        getTimeAmt: () ->
+            return '2 days'
+
+
+        getTimeBasis: () ->
+            return 'now'
 

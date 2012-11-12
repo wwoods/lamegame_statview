@@ -1,0 +1,17 @@
+.dashboard {
+}
+
+.dashboard-cell {
+    display: inline-block;
+    position: relative;
+}
+
+.dashboard-container {
+    width: 100%;
+}
+
+.dashboard-new {
+    background-color: #dfd;
+    border: solid 1px #030;
+    cursor: pointer;
+}

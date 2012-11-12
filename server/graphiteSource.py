@@ -26,7 +26,8 @@ class GraphiteSource(object):
 
     def getStats(self):
         url = '/metrics/index.json'
-        r = json.loads(self._request(url, keepGzip = False))
+        req = self._request(url, keepGzip = False)
+        r = json.loads(req)
         return r
 
 

@@ -3,6 +3,7 @@ class LgTaskSource(object):
     def __init__(self, config):
         self._config = config
 
+        # Import here so people without lgTask aren't affected
         import lgTask
         self._conn = lgTask.Connection(self._config['url'])
         self._stats = self._conn.stats
