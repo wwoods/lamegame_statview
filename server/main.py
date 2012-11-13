@@ -49,19 +49,13 @@ class MainRoot(object):
         if 'storage' in cherrypy.app:
             url = cherrypy.app['storage']['dashboards']
             if url.startswith('pymongo://'):
-                m = re.match("^pymongo://([^:@]+(:[^@]+)?@)?([^/]+)(:[^/]+)?(/[^/]+)?(/[^/]+)?$", url)
-                if m is None:
-                    raise ValueError("Invalid pymongo url: " + url)
-                user, pwd, host, port, db, coll = m.groups()
-                if coll is None:
-                    raise ValueError("Storage needs collection")
-                # Import so pymongo isn't required; storage is not necessary
-                # to run the app
-                import pymongo
-                self._storage = pymongo.Connection(host = host, port = port,
-                        auto_start_request = False)
-                # 1: strips leading slash
-                self._storage = self._storage[db[1:]][coll[1:]]
+                # Do the import here so pymongo isn't required in places
+                # that are not using it
+                from server.storage.mongoStore import MongoCollection
+                self._storage = MongoCollection(url)
+            elif url.startswith('shelve://'):
+                from server.storage.shelveStore import ShelveCollection
+                self._storage = ShelveCollection(url)
             else:
                 raise ValueError("Unknown 'dashboards' URL: " + url)
         else:
@@ -71,6 +65,16 @@ class MainRoot(object):
     @cherrypy.expose
     def index(self):
         return cherrypy.lib.static.serve_file(_DIR + '/webapp/app.html')
+    
+    
+    @cherrypy.expose
+    @cherrypy.config(**{ 'response.headers.Content-Type': 'application/json' })
+    def deleteDashboard(self, dashId):
+        if self._storage is None:
+            return json.dumps(dict(error = "Can't save without storage"))
+        
+        self._storage.delete(dashId)
+        return json.dumps(dict(ok = True))
 
 
     @cherrypy.expose

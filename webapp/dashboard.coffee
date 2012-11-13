@@ -3,6 +3,11 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
         constructor: (child) ->
             super('<div class="dashboard-cell"></div>')
             @append(child)
+            
+            
+        remove: () ->
+            @trigger("needs-save")
+            super()
 
 
     class DashboardNew extends ui.Base
@@ -20,6 +25,7 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             super
                 root: '<div class="dashboard-container"></div>'
                 handleSelector: '.controls-collapse'
+                afterDrag: () => @trigger("needs-save")
 
             @columns = columns
             @ratio = 0.618 # height / width
@@ -38,7 +44,7 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
                         @append(new Graph(config))
 
 
-        append: (graph) ->
+        append: (graph, insertAfter) ->
             ### Creates a cell to contain the graph and adds it to our view.
 
             Returns the new cell
@@ -48,7 +54,12 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             # Window width can change on insert
             oSize = $(window).width()
             if graph instanceof Graph
-                @_createNew.before(cell)
+                if insertAfter?
+                    if not insertAfter.is('.dashboard-cell')
+                        insertAfter = insertAfter.closest('.dashboard-cell')
+                    insertAfter.after(cell)
+                else
+                    @_createNew.before(cell)
             else
                 # Create new placeholder
                 super(cell)

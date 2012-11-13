@@ -97,13 +97,23 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
             ok = new ui.Base("<input type=\"button\" value=\"Refresh\" />")
             @_content.append ok
 
+            cloner = new ui.Base('<input type="button" value="Clone" />')
+            cloner.css
+                position: 'relative'
+                float: 'right'
+            @_content.append(cloner)
+            cloner.bind "click", () =>
+                Graph = require("cs!graph")
+                @uiClosest('.dashboard-container').append(
+                        new Graph(@_graph.config), @)
+                ui.Shade.hide()
             deleter = new ui.Base('<input type="button" value="Delete" />')
             deleter.css
-                position: 'absolute'
-                right: '2px'
+                position: 'relative'
+                float: 'right'
             @_content.append(deleter)
             deleter.bind "click", () =>
-                @closest('.dashboard-cell').remove()
+                @uiClosest('.dashboard-cell').remove()
 
             # Populate initial fields from graph
             options = @_graph.config

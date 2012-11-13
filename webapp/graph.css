@@ -36,6 +36,9 @@
 .graph-title {
     display: inline-block;
     cursor: pointer;
+    /* Align after controls collapser */
+    position: relative;
+    left: 1.2em;
 }
 .graph-title:hover {
     background-color: #eee;

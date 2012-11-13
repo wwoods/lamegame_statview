@@ -36,25 +36,8 @@ module = (ui, Stat, Controls) ->
             expanded = not config?
             self._controls = new Controls(self, expanded).appendTo(self)
             self._overlay = $('<div class="graph-overlay"></div>').appendTo(@)
-            self._title = $('<div class="graph-title"></div>').appendTo(
-                @_overlay)
-            @_overlay.append(' ')
             self._loadingOverlay = $('<div class="graph-loading-overlay">
                     </div>').appendTo(@_overlay)
-
-            @_title.bind('click', () =>
-                cfg = $.extend({}, @config)
-                # Grab our time basis
-                cfg.timeBasis = 'now'
-                cfg.timeAmt = '2 hours'
-                g = new Graph(cfg)
-                page = $('<div class="graph-fullscreen"></div>')
-                page.append(g).appendTo('body')
-                page.bind('click', (e) =>
-                    if e.target == page[0]
-                        page.remove()
-                )
-            )
 
             # Render once we're attached to dashboard
             ui.setZeroTimeout () =>
@@ -101,6 +84,11 @@ module = (ui, Stat, Controls) ->
         update: (configChanges) ->
             self = this
             if configChanges
+                for q of configChanges
+                    if not $.compareObjs(self.config[q], configChanges[q])
+                        # Something actually changed
+                        self.trigger("needs-save")
+                        break
                 $.extend(self.config, configChanges)
             
             # Clear out old autorefresh
@@ -114,7 +102,6 @@ module = (ui, Stat, Controls) ->
                 return
 
             # Set up title and loading stuff
-            self._title.text(self.config.title)
             self._loadingOverlay.text('(Loading data, please wait)')
 
             # Set new autorefresh
@@ -254,7 +241,7 @@ module = (ui, Stat, Controls) ->
             if smoothSecs < pointTimes[1] - pointTimes[0]
                 # If smoothing was too small for between points, use point density
                 smoothSecs = pointTimes[1] - pointTimes[0]
-            console.log("Final smooth: " + smoothSecs)
+            #console.log("Final smooth: " + smoothSecs)
 
             movingTotal = 0.0
             movingIndex = srcIndex
@@ -445,10 +432,12 @@ module = (ui, Stat, Controls) ->
                 d = new Date()
                 d.setTime(intervalMax * 1000)
                 
-                # Daylight savings fun!!!
-                if intervalLength > 23.9 * 60 * 60 and d.getHours() != 0
-                    intervalMax -= d.getHours() * 60 * 60
-                    d.setTime(intervalMax * 1000)
+                # This fixes daylight savings, but also is kind of nice if an
+                # exact day should happen to fall between two intervals
+                leftInDay = d.getHours() * 60 * 60 + d.getMinutes() * 60
+                if intervalLength > leftInDay
+                	intervalMax -= leftInDay
+                	d.setTime(intervalMax * 1000)
 
                 if d.getHours() == 0 and d.getMinutes() == 0
                     # Month : day timestamps
@@ -507,9 +496,8 @@ module = (ui, Stat, Controls) ->
                 .attr('stroke', 'black')
 
 
-        _drawGraph_area: (dataSets, display, tickHeight) ->
+        _drawGraph_area: (dataSets, display, height) ->
             width = display.width()
-            height = display.height() - tickHeight
             xmin = dataSets[0][0].x
             xmax = dataSets[0][dataSets[0].length - 1].x
 
@@ -537,12 +525,12 @@ module = (ui, Stat, Controls) ->
             # First render
             vis = d3.select(display[0]).append('svg')
             vis.attr('width', width).attr('height', height)
-            color = d3.scale.category10()
+            color = Graph.colors
             self = @
             vis.selectAll("path")
                 .data(stacks).enter()
                     .append("path")
-                    .style("fill", () -> color(Math.random()))
+                    .style("fill", (d) -> color(d[0].title))
                     .attr("d", getAreaMethod())
                     .on("mousemove", (d) =>
                         val = @_eventInterp(d)
@@ -551,9 +539,8 @@ module = (ui, Stat, Controls) ->
                     .on("mouseout", () -> ui.Tooltip.hide())
 
 
-        _drawGraph_area_zoom: (dataSets, display, tickHeight) ->
+        _drawGraph_area_zoom: (dataSets, display, height) ->
             width = display.width()
-            height = display.height() - tickHeight
             xmin = dataSets[0][0].x
             xmax = dataSets[0][dataSets[0].length - 1].x
             relativeToAll = false
@@ -598,9 +585,9 @@ module = (ui, Stat, Controls) ->
             vis = d3.select(display[0]).append('svg')
             visHeight = height - trendHeight
             vis.attr('width', width).attr('height', visHeight)
-            color = d3.scale.category20()
-            # color = d3.interpolateRgb("#aad", "#556")
+            
             self = @
+            color = Graph.colors
             area = d3.svg.area()
             area
                 .x((d) -> (d.x - xmin) * width / (xmax - xmin))
@@ -609,7 +596,7 @@ module = (ui, Stat, Controls) ->
             vis.selectAll("path")
                 .data(stacks).enter()
                     .append("path")
-                    .style("fill", () -> color(Math.random()))
+                    .style("fill", (d) -> color(d[0].title))
                     .attr("d", area)
                     .on("mousemove", (d) =>
                         val = @_eventInterp(d)
@@ -650,11 +637,11 @@ module = (ui, Stat, Controls) ->
             visn = d3.select(display[0]).append('svg')
             visn.attr('width', width).attr('height', trendHeight - 1)
             $(visn[0]).css('border-top', 'solid 1px #444')
-            color = d3.interpolateRgb("#aad", "#556")
+            color = Graph.colors
             visn.selectAll("path")
                 .data(stackn).enter()
                     .append("path")
-                    .style("fill", () -> color(Math.random()))
+                    .style("fill", (d) -> color(d[0].title))
                     .attr(
                         "d"
                         d3.svg.area()
@@ -710,6 +697,33 @@ module = (ui, Stat, Controls) ->
             if isNeg
                 valStr = '-' + valStr
             return valStr
+            
+            
+        _getColorHex: (r, g, b) ->
+            ### Given three numbers from 0-255, return "#abcdef" style string
+            ###
+            rs = r.toString(16)
+            gs = g.toString(16)
+            bs = b.toString(16)
+            if rs.length < 2
+                rs = "0" + rs
+            if gs.length < 2
+                gs = "0" + gs
+            if bs.length < 2
+                bs = "0" + bs
+            return '#' + rs + gs + bs
+            
+            
+        _hashString: (str) ->
+            # Start with a large prime number
+            hash = 19175002942688032928599
+            for i in [0...str.length]
+                char = str.charCodeAt(i)
+                # More entropy for small strings
+                for q in [0...5]
+                    hash = ((hash << 5) - hash) + char
+                    hash = hash & hash # Make 32 bit integer
+            return hash
 
 
         _iterateTargets: (outputs, stats, statData, groups, groupIndex,
@@ -870,6 +884,22 @@ module = (ui, Stat, Controls) ->
 
             #-------------- OLD (relevant) CODE -------------------
             tickHeight = 20
+            
+            # Render title
+            _title = $('<div class="graph-title"></div>').appendTo(
+                @_display).text(@config.title)
+            _title.bind 'click', () =>
+                cfg = $.extend({}, @config)
+                # Grab our time basis
+                dash = ui.fromDom(@closest('.dashboard'))
+                cfg.timeBasis = dash.getTimeBasis()
+                cfg.timeAmt = dash.getTimeAmt()
+                g = new Graph(cfg)
+                page = $('<div class="graph-fullscreen"></div>')
+                page.append(g).appendTo('body')
+                page.bind 'click', (e) =>
+                    if e.target == page[0]
+                        page.remove()
 
             @_drawAxis
                 tickHeight: tickHeight
@@ -878,7 +908,7 @@ module = (ui, Stat, Controls) ->
 
             display = self._display
             width = display.width()
-            height = display.height() - tickHeight
+            height = display.height() - tickHeight - _title.height()
 
             xmin = dataSets[0][0].x
             xmax = dataSets[0][dataSets[0].length - 1].x
@@ -888,7 +918,7 @@ module = (ui, Stat, Controls) ->
             drawGraphArgs = [
                 dataSets
                 @_display
-                tickHeight
+                height
             ]
             if @config.type == 'area'
                 @_drawGraph_area.apply(@, drawGraphArgs)
@@ -899,6 +929,9 @@ module = (ui, Stat, Controls) ->
 
             # Remove loaded message
             loadedText.remove()
+            
+    Graph.colors = d3.scale.category20()
+    return Graph
 
 
 define(reqs, module)
