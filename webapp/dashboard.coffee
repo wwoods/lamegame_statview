@@ -16,16 +16,18 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
 
 
     class DashboardContainer extends ui.DragContainer
-        constructor: (definition) ->
+        constructor: (definition, columns) ->
             super
                 root: '<div class="dashboard-container"></div>'
                 handleSelector: '.controls-collapse'
 
-            @columns = 2
+            @columns = columns
             @ratio = 0.618 # height / width
 
             # Let us get added to dom, since we'll need a valid width
             ui.setZeroTimeout () =>
+                @app = ui.fromDom(@closest('.stats-app'))
+
                 @_createNew = new DashboardNew()
                 @_createNew.bind "click", () =>
                     @append(new Graph())
@@ -50,9 +52,20 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             else
                 # Create new placeholder
                 super(cell)
-            if oSize != $(window).width()
-                @resize()
+            ui.setZeroTimeout () =>
+                # In setZeroTimeout since the scrollbar is not added until
+                # the window refreshes (at least in chrome)
+                if oSize != $(window).width()
+                    @resize()
             return cell
+
+
+        refresh: () ->
+            # Refresh all graphs
+            for cell in @children()
+                graph = ui.fromDom($(cell).children())
+                if graph instanceof Graph
+                    graph.update()
 
 
         resize: () ->
@@ -63,16 +76,17 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
 
         _resizeCell: (cell) ->
             w = @width() / @columns
+            h = Math.min(w * @ratio, $(window).height() - @app.header.height())
             cell.css
                 width: w
-                height: w * @ratio
+                height: h
 
 
     class Dashboard extends ui.Base
-        constructor: (definition) ->
+        constructor: (definition, columns = 2) ->
             super('<div class="dashboard"></div>')
 
-            @container = new DashboardContainer(definition).appendTo(@)
+            @container = new DashboardContainer(definition, columns).appendTo(@)
 
             $(window).resize () =>
                 @container.resize()
@@ -99,9 +113,14 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
 
 
         getTimeAmt: () ->
-            return '2 days'
+            return ui.fromDom('.stats-header').timeAmt.val()
 
 
         getTimeBasis: () ->
             return 'now'
+
+
+        refresh: () ->
+            @container.refresh()
+            
 

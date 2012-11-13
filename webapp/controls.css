@@ -1,5 +1,4 @@
 .controls {
-    width: 200px;
     position: absolute;
     left: 0;
     top: 0;
@@ -13,6 +12,7 @@
     cursor: pointer;
 }
 .controls-content {
+    position: relative;
     display: inline-block;
     background-color: #f4f4f4;
     border: solid 1px #000;

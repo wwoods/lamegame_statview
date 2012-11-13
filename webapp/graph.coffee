@@ -10,6 +10,8 @@ module = (ui, Stat, Controls) ->
                     self)
 
             self.config =
+                title: '(unnamed)'
+                type: 'area-zoom'
                 expr: ''
                 # List of (groupName, filterRegex) to break down results. 
                 # filterRegex is the text, and may be empty string for none
@@ -33,8 +35,26 @@ module = (ui, Stat, Controls) ->
 
             expanded = not config?
             self._controls = new Controls(self, expanded).appendTo(self)
-            self._overlay = $('<div class="graph-overlay"></div>').appendTo(
-                    self)
+            self._overlay = $('<div class="graph-overlay"></div>').appendTo(@)
+            self._title = $('<div class="graph-title"></div>').appendTo(
+                @_overlay)
+            @_overlay.append(' ')
+            self._loadingOverlay = $('<div class="graph-loading-overlay">
+                    </div>').appendTo(@_overlay)
+
+            @_title.bind('click', () =>
+                cfg = $.extend({}, @config)
+                # Grab our time basis
+                cfg.timeBasis = 'now'
+                cfg.timeAmt = '2 hours'
+                g = new Graph(cfg)
+                page = $('<div class="graph-fullscreen"></div>')
+                page.append(g).appendTo('body')
+                page.bind('click', (e) =>
+                    if e.target == page[0]
+                        page.remove()
+                )
+            )
 
             # Render once we're attached to dashboard
             ui.setZeroTimeout () =>
@@ -54,9 +74,14 @@ module = (ui, Stat, Controls) ->
             else if /h(ou)?r?s?$/.test(interval)
                 # Hours
                 return parseFloat(interval) * 60 * 60
-            else
+            else if /w(ee)?k?s?$/.test(interval)
+                # Weeks
+                return parseFloat(interval) * 7 * 24 * 60 * 60
+            else if /\d+$/.test(interval)
                 # default
                 return parseFloat(interval) * defaultInterval
+            else
+                throw "Invalid interval: " + interval
 
 
         parseStats: (expr) ->
@@ -85,14 +110,12 @@ module = (ui, Stat, Controls) ->
 
             if self.config.expr == null or self.config.expr == ''
                 self._display.empty()
-                self._overlay.empty().append(
-                    '<div>No data selected</div>'
-                )
+                self._loadingOverlay.text('(No data selected)')
                 return
 
-            self._overlay.empty().append(
-                '<div>Loading data, please wait</div>'
-            )
+            # Set up title and loading stuff
+            self._title.text(self.config.title)
+            self._loadingOverlay.text('(Loading data, please wait)')
 
             # Set new autorefresh
             if self.config.autoRefresh > 0
@@ -159,7 +182,7 @@ module = (ui, Stat, Controls) ->
                     timeTo: Math.floor(timeTo)
                 }
                 success: (data) -> self._onLoaded(data, timeFrom, timeTo, stats)
-                error: () -> self._overlay.text('Failed to load')
+                error: () -> self._loadingOverlay.text('(Failed to load)')
             })
 
 
@@ -335,8 +358,364 @@ module = (ui, Stat, Controls) ->
             return result
 
 
+        _drawAxis: (options) ->
+            tickHeight = options.tickHeight
+            dataSets = options.dataSets
+            display = options.display
+
+            width = display.width()
+            height = display.height()
+
+            xmin = dataSets[0][0].x
+            xmax = dataSets[0][dataSets[0].length - 1].x
+            xcount = dataSets[0].length
+            intervalMax = xmax
+            intervalLength = 60
+            ticks = width / 40
+
+            # Initially, intervalLength is minutes
+            denoms = [
+                # Note - try to keep diff between denoms around 3 or 4 to
+                # make it less likely to have very few denoms.  Most be > 2
+                # ALSO - Denoms < days MUST BE integer multiples
+                # Minutes
+                2
+                5
+                15
+                30
+                # Hours
+                1*60
+                4*60
+                12*60
+                # Days
+                24*60
+                2*24*60
+                5*24*60
+                15*24*60
+                30*24*60
+                90*24*60
+            ]
+            lastd = 1
+            for d in denoms
+                if (xmax - xmin) / intervalLength > ticks
+                    intervalLength *= d / lastd
+                    lastd = d
+                else
+                    break
+
+            # Now that we have "optimal" length, align to nearest whole time 
+            # unit
+            intervalShift = 0
+            maxDate = new Date()
+            maxDate.setTime(xmax * 1000)
+            minDate = new Date()
+            minDate.setTime(xmin * 1000)
+
+            timeToReset = [
+                # Array of lambdas based off of maxDate to get the number of
+                # seconds to take off to reach the next "round" tick
+                () -> maxDate.getSeconds()
+                () -> (maxDate.getMinutes() % 5) * 60
+                () -> (maxDate.getMinutes() % 20) * 60
+                () -> (maxDate.getMinutes() % 30) * 60
+                () -> maxDate.getMinutes() * 60
+                () -> (maxDate.getHours() % 2) * 60*60
+                () -> (maxDate.getHours() % 6) * 60*60
+                () -> maxDate.getHours() * 60*60
+            ]
+
+            for nextResetFn in timeToReset
+                nextReset = nextResetFn()
+                if intervalShift + nextReset < intervalLength * xcount
+                    intervalShift += nextReset
+                    maxDate.setTime((intervalMax - intervalShift) * 1000)
+                else
+                    break
+
+            # Effect the interval
+            intervalMax -= intervalShift
+            if intervalShift > intervalLength
+                # We've set back more than one interval, to align with a 
+                # greater time period.  We need to add back missing intervals
+                while intervalMax + intervalLength < xmax
+                    intervalMax += intervalLength
+
+            intervals = []
+            while intervalMax > xmin
+                d = new Date()
+                d.setTime(intervalMax * 1000)
+                
+                # Daylight savings fun!!!
+                if intervalLength > 23.9 * 60 * 60 and d.getHours() != 0
+                    intervalMax -= d.getHours() * 60 * 60
+                    d.setTime(intervalMax * 1000)
+
+                if d.getHours() == 0 and d.getMinutes() == 0
+                    # Month : day timestamps
+                    months =
+                        0: 'Jan'
+                        1: 'Feb'
+                        2: 'Mar'
+                        3: 'Apr'
+                        4: 'May'
+                        5: 'Jun'
+                        6: 'Jul'
+                        7: 'Aug'
+                        8: 'Sep'
+                        9: 'Oct'
+                        10: 'Nov'
+                        11: 'Dec'
+                    label = months[d.getMonth()] + d.getDate().toString()
+                else
+                    # Hour : Minute timestamps
+                    hrs = d.getHours().toString()
+                    if hrs.length < 2
+                        hrs = '0' + hrs
+                    mins = d.getMinutes().toString()
+                    if mins.length < 2
+                        mins = '0' + mins
+                    label = hrs + ':' + mins
+
+                intervals.push(
+                    x: (intervalMax - xmin) * width / (xmax - xmin)
+                    label: label 
+                )
+
+                intervalMax -= intervalLength
+
+            axis = d3.select(display[0])
+                .append('svg')
+            $(axis[0]).css
+                position: 'absolute'
+                bottom: 0
+                left: 0
+            axis
+                .attr('width', width).attr('height', tickHeight)
+            axisContext = axis.selectAll()
+                .data(intervals)
+                .enter()
+            axisContext.append('text')
+                .attr('text-anchor', 'middle')
+                .attr('x', (d) -> d.x)
+                .attr('y', '18')
+                .text((d) -> d.label)
+            axisContext.append('svg:line')
+                .attr('x1', (d) -> d.x)
+                .attr('x2', (d) -> d.x)
+                .attr('y1', '0')
+                .attr('y2', '5')
+                .attr('stroke', 'black')
+
+
+        _drawGraph_area: (dataSets, display, tickHeight) ->
+            width = display.width()
+            height = display.height() - tickHeight
+            xmin = dataSets[0][0].x
+            xmax = dataSets[0][dataSets[0].length - 1].x
+
+            # d3.layout.stack() adds the "y0" property to dataSets, and stacks 
+            # them
+            stacks = d3.layout.stack().offset('wiggle')(dataSets)
+            ymax = Math.max.apply(Math, stacks.map(
+                (a) ->
+                    a.reduce(
+                        (last, d) ->
+                            Math.max(d.y + d.y0, last)
+                        0
+                    )
+            ))
+
+            getAreaMethod = () ->
+                useYmax = ymax
+                area = d3.svg.area()
+                    .x((d) -> (d.x - xmin) * width / (xmax - xmin))
+                    .y0((d) -> height - d.y0 * height / useYmax)
+                    .y1((d) -> height - (d.y + d.y0) * height / useYmax)
+                return area
+
+
+            # First render
+            vis = d3.select(display[0]).append('svg')
+            vis.attr('width', width).attr('height', height)
+            color = d3.scale.category10()
+            self = @
+            vis.selectAll("path")
+                .data(stacks).enter()
+                    .append("path")
+                    .style("fill", () -> color(Math.random()))
+                    .attr("d", getAreaMethod())
+                    .on("mousemove", (d) =>
+                        val = @_eventInterp(d)
+                        ui.Tooltip.show(d3.event, d[0].title + ': ' + val)
+                    )
+                    .on("mouseout", () -> ui.Tooltip.hide())
+
+
+        _drawGraph_area_zoom: (dataSets, display, tickHeight) ->
+            width = display.width()
+            height = display.height() - tickHeight
+            xmin = dataSets[0][0].x
+            xmax = dataSets[0][dataSets[0].length - 1].x
+            relativeToAll = false
+
+            # Pixels height for the overall trend graph
+            trendHeight = height * 0.3 
+
+            combined = []
+            for dp in dataSets[0]
+                # Copy each object, since values are modified
+                combined.push($.extend({}, dp))
+            for ds in dataSets[1..]
+                for pt, i in ds
+                    combined[i].y += pt.y
+            console.log("combined")
+            console.log(combined)
+            ymax = combined.reduce(
+                (last, d) -> Math.max(d.y, last)
+                0
+            )
+
+            # 100% expand render - remap points to [0..1] based on portion of
+            # combined
+            for i in [0...dataSets[0].length]
+                for ds in dataSets
+                    # If this layer is imperceptible, set ynorm to 0
+                    if combined[i].y < ymax / (2*height) and combined[i].y < 1
+                        ds[i].ynorm = 0
+                    else
+                        ds[i].ynorm = ds[i].y / combined[i].y
+
+            # d3.layout.stack() adds the "y0" property to dataSets, and stacks 
+            # them
+            stacksGen = d3.layout.stack().offset('zero')
+                .y((d) -> d.ynorm)
+                .out (d, y0, y) ->
+                    d.y0 = y0
+            stacks = stacksGen(dataSets)
+            stackOrder = [0...dataSets.length]
+
+            # Draw the proportional bit
+            vis = d3.select(display[0]).append('svg')
+            visHeight = height - trendHeight
+            vis.attr('width', width).attr('height', visHeight)
+            color = d3.scale.category20()
+            # color = d3.interpolateRgb("#aad", "#556")
+            self = @
+            area = d3.svg.area()
+            area
+                .x((d) -> (d.x - xmin) * width / (xmax - xmin))
+                .y0((d) -> visHeight - d.y0 * visHeight)
+                .y1((d) -> visHeight - (d.ynorm + d.y0) * visHeight)
+            vis.selectAll("path")
+                .data(stacks).enter()
+                    .append("path")
+                    .style("fill", () -> color(Math.random()))
+                    .attr("d", area)
+                    .on("mousemove", (d) =>
+                        val = @_eventInterp(d)
+                        ui.Tooltip.show(d3.event, d[0].title + ': ' + val)
+                    )
+                    .on("mouseout", () -> ui.Tooltip.hide())
+                    .on("click", (d, di) =>
+                        console.log(arguments)
+                        console.log(stackOrder)
+
+                        # Remove current stackOrder == di and put it at 0
+                        # Swap current 0 with stackOrder == di
+                        diPos = -1
+                        for q, j in stackOrder
+                            if q == di
+                                diPos = j
+                                break
+
+                        stackOrder = stackOrder[...diPos].concat(
+                            stackOrder[diPos + 1..])
+                        stackOrder.unshift(di)
+                        
+                        # Run the d3.layout.stack on a sorted version of our
+                        # dataSets
+                        toStack = []
+                        for i in stackOrder
+                            toStack.push(dataSets[i])
+                        stacks = stacksGen(toStack)
+                        vis.selectAll("path")
+                            .data(dataSets)
+                            .transition()
+                                .duration(1000)
+                                .attr("d", area)
+                    )
+
+            # Draw the overall trend graph
+            stackn = d3.layout.stack().offset('zero')([ combined ])
+            visn = d3.select(display[0]).append('svg')
+            visn.attr('width', width).attr('height', trendHeight - 1)
+            $(visn[0]).css('border-top', 'solid 1px #444')
+            color = d3.interpolateRgb("#aad", "#556")
+            visn.selectAll("path")
+                .data(stackn).enter()
+                    .append("path")
+                    .style("fill", () -> color(Math.random()))
+                    .attr(
+                        "d"
+                        d3.svg.area()
+                            .x((d) -> (d.x - xmin) * width / (xmax - xmin))
+                            .y0((d) -> trendHeight * (1.0 - d.y / ymax))
+                            .y1((d) -> trendHeight)
+                    )
+                    .on("mousemove", (d) =>
+                        text = 'Combined: '
+                        text += @_eventInterp(d)
+                        for ds in dataSets
+                            text += '<br/>' + ds[0].title + ': '
+                            text += @_eventInterp(ds)
+                        ui.Tooltip.show(d3.event, text)
+                    )
+                    .on("mouseout", () -> ui.Tooltip.hide())
+
+
+        _eventInterp: (dataSet) ->
+            ### Use d3.event to interpolate our position in the dataSet, and
+            return a string representing the value at this point.
+            ###
+            x = d3.event.pageX
+            svgStart = @_display.offset().left
+            svgWidth = @_display.width()
+            # For interp, last point happens at far-right, first point
+            # happens at svgStart
+            interp = (dataSet.length - 1) * (x - svgStart) / svgWidth
+            idx = Math.floor(interp)
+            idx2 = idx + 1
+            if idx2 < dataSet.length
+                u = interp - idx
+                val = dataSet[idx].y * (1 - u) + dataSet[idx2].y * u
+            else
+                val = dataSet[idx].y
+
+            # Non-integers, change to precision if they're less than
+            # a certain amount.  Otherwise, make it by fixed.
+            isNeg = (val < 0)
+            nval = Math.abs(val)
+            if nval == 0
+                valStr = '0'
+            else if nval > 1000000
+                valStr = (nval / 1000000.0).toPrecision(3) + 'M'
+            else if nval > 1000
+                valStr = (nval / 1000.0).toPrecision(3) + 'K'
+            else if nval < 0.000001
+                valStr = (nval * 1000000).toPrecision(3) + 'e-6'
+            else if nval < 0.001
+                valStr = (nval * 1000).toPrecision(3) + 'e-3'
+            else
+                valStr = nval.toPrecision(3)
+            if isNeg
+                valStr = '-' + valStr
+            return valStr
+
+
         _iterateTargets: (outputs, stats, statData, groups, groupIndex,
                 groupValues) ->
+            # Come up with all of the statistics we need to load for the 
+            # given path parameters
             if groupIndex == groups.length
                 for stat in stats
                     t = stat.getTarget(statData)
@@ -357,7 +736,7 @@ module = (ui, Stat, Controls) ->
             # request (timeFrom as well).  stats passed to avoid re-parsing.
             self = this
             self._display.empty()
-            self._overlay.empty()
+            self._loadingOverlay.empty()
 
             # For drawing the graph, we explicitly don't use self._overlay, 
             # since that gets overwritten if we need to auto-update as fast as 
@@ -436,16 +815,36 @@ module = (ui, Stat, Controls) ->
 
             # JS Sandbox
             # Thanks to http://stackoverflow.com/questions/543533/restricting-eval-to-a-narrow-scope
-            maskedEval = (scr, ctx) ->
+            getMaskedEval = (scr) ->
+                ### Returns a function which, given a context ctx, evaluates
+                the expression scr and returns the result.
+
+                NOTE - For speed, previous ctx variables are NOT erased, 
+                meaning that if a value is NOT specified, it will use the
+                value from the last iteration.
+                ###
                 mask = {}
                 for p of this
                     mask[p] = undefined
-                for p of ctx
-                    mask[p] = ctx[p]
-                (new Function("with(this) { return " + scr + "}")).call(mask)
+
+                fn = new Function("with(this) { return " + scr + "}")
+
+                return (ctx) ->
+                    for p of ctx
+                        mask[p] = ctx[p]
+                    return fn.call(mask)
 
             # ================== ADAPTER CODE ==================
             dataSets = []
+
+            # Compile expr
+            expr = self.config.expr
+            for s, q in stats
+                newName = 'v' + q
+                expr = expr.replace(s.name, newName)
+            myFn = getMaskedEval(expr)
+            
+            # Run expr to get each point
             for groupVal of data
                 dataSet = data[groupVal]
                 if groupVal == 'values'
@@ -458,13 +857,10 @@ module = (ui, Stat, Controls) ->
                 newValues = []
                 for j in [0...dataSet.values[s1].length]
                     ctx = {}
-                    expr = self.config.expr
                     for s, q in stats
                         vals = dataSet.values[s.name]
-                        newName = 'v' + q
-                        ctx[newName] = vals[j]
-                        expr = expr.replace(s.name, newName)
-                    result = maskedEval(expr, ctx)
+                        ctx['v' + q] = vals[j]
+                    result = myFn(ctx)
                     newValues.push(
                         x: pointTimes[j]
                         y: result
@@ -473,214 +869,37 @@ module = (ui, Stat, Controls) ->
                 dataSets.push(newValues)
 
             #-------------- OLD (relevant) CODE -------------------
+            tickHeight = 20
+
+            @_drawAxis
+                tickHeight: tickHeight
+                dataSets: dataSets
+                display: @_display
+
             display = self._display
             width = display.width()
-            height = display.height() - 32
-            vis = d3.select(display[0]).append('svg')
-            vis.attr('width', width).attr('height', height)
+            height = display.height() - tickHeight
 
             xmin = dataSets[0][0].x
             xmax = dataSets[0][dataSets[0].length - 1].x
-            intervalMax = xmax
-            intervalLength = 60
 
-            if (xmax - xmin) / intervalLength > 20
-                intervalLength *= 5
-            if (xmax - xmin) / intervalLength > 20
-                intervalLength *= 4
-            # An hour
-            if (xmax - xmin) / intervalLength > 20
-                intervalLength *= 3
-            # 4 hours?
-            if (xmax - xmin) / intervalLength > 20
-                intervalLength *= 4
-            # A day?
-            if (xmax - xmin) / intervalLength > 20
-                intervalLength *= 6
-            # 5 days?
-            if (xmax - xmin) / intervalLength > 20
-                intervalLength *= 5
-            # 30 days?
-            if (xmax - xmin) / intervalLength > 20
-                intervalLength *= 6
-            # 90 days?
-            if (xmax - xmin) / intervalLength > 20
-                intervalLength *= 3
-
-            # Now that we have "optimal" length, align to nearest whole time unit
-            intervalShift = 0
-            maxDate = new Date()
-            maxDate.setTime(intervalMax * 1000)
-
-            nextReset = maxDate.getSeconds()
-            if intervalShift + nextReset < intervalLength
-                intervalShift += nextReset
-                maxDate.setTime((intervalMax - intervalShift) * 1000)
-            nextReset = (maxDate.getMinutes() % 5) * 60
-            if intervalShift + nextReset < intervalLength
-                intervalShift += nextReset
-                maxDate.setTime((intervalMax - intervalShift) * 1000)
-            nextReset = (maxDate.getMinutes() % 20) * 60
-            if intervalShift + nextReset < intervalLength
-                intervalShift += nextReset
-                maxDate.setTime((intervalMax - intervalShift) * 1000)
-            nextReset = (maxDate.getMinutes() % 30) * 60
-            if intervalShift + nextReset < intervalLength
-                intervalShift += nextReset
-                maxDate.setTime((intervalMax - intervalShift) * 1000)
-            nextReset = maxDate.getMinutes() * 60
-            if intervalShift + nextReset < intervalLength
-                intervalShift += nextReset
-                maxDate.setTime((intervalMax - intervalShift) * 1000)
-            nextReset = (maxDate.getHours() % 2) * 60 * 60
-            if intervalShift + nextReset < intervalLength
-                intervalShift += nextReset
-                maxDate.setTime((intervalMax - intervalShift) * 1000)
-            nextReset = (maxDate.getHours() % 6) * 60 * 60
-            if intervalShift + nextReset < intervalLength
-                intervalShift += nextReset
-                maxDate.setTime((intervalMax - intervalShift) * 1000)
-            nextReset = (maxDate.getHours()) * 60 * 60
-            if intervalShift + nextReset < intervalLength
-                intervalShift += nextReset
-                maxDate.setTime((intervalMax - intervalShift) * 1000)
-            # Effect the interval
-            intervalMax -= intervalShift
-
-            intervals = []
-            while intervalMax > xmin
-                d = new Date()
-                d.setTime(intervalMax * 1000)
-                
-                # Daylight savings fun!!!
-                if intervalLength > 23.9 * 60 * 60 and d.getHours() != 0
-                    intervalMax -= d.getHours() * 60 * 60
-                    d.setTime(intervalMax * 1000)
-
-                if d.getHours() == 0 and d.getMinutes() == 0
-                    # Month : day timestamps
-                    months =
-                        0: 'Jan'
-                        1: 'Feb'
-                        2: 'Mar'
-                        3: 'Apr'
-                        4: 'May'
-                        5: 'Jun'
-                        6: 'Jul'
-                        7: 'Aug'
-                        8: 'Sep'
-                        9: 'Oct'
-                        10: 'Nov'
-                        11: 'Dec'
-                    label = months[d.getMonth()] + d.getDate().toString()
-                else
-                    # Hour : Minute timestamps
-                    hrs = d.getHours().toString()
-                    if hrs.length < 2
-                        hrs = '0' + hrs
-                    mins = d.getMinutes().toString()
-                    if mins.length < 2
-                        mins = '0' + mins
-                    label = hrs + ':' + mins
-
-                intervals.push(
-                    x: (intervalMax - xmin) * width / (xmax - xmin)
-                    label: label 
-                )
-
-                intervalMax -= intervalLength
-
-            axis = d3.select(display[0])
-                .append('svg')
-                .attr('width', width).attr('height', 32)
-            axisContext = axis.selectAll()
-                .data(intervals)
-                .enter()
-            axisContext.append('text')
-                .attr('text-anchor', 'middle')
-                .attr('x', (d) -> d.x)
-                .attr('y', '18')
-                .text((d) -> d.label)
-            axisContext.append('svg:line')
-                .attr('x1', (d) -> d.x)
-                .attr('x2', (d) -> d.x)
-                .attr('y1', '0')
-                .attr('y2', '5')
-                .attr('stroke', 'black')
-
+            console.log("dataSets")
             console.log(dataSets)
-            # Stack adds the "y0" property to dataSets, and stacks them
-            stack = d3.layout.stack().offset('wiggle')(dataSets)
-            ymax = Math.max.apply(Math, stack.map(
-                (a) ->
-                    a.reduce(
-                        (last, d) ->
-                            Math.max(d.y + d.y0, last)
-                        0
-                    )
-            ))
-            window.stack = stack
-
-            onMouseOver = (d) ->
-                x = d3.event.pageX
-                svgStart = $(this).closest('svg').offset().left
-                svgWidth = $(this).closest('svg').width()
-                # For interp, last point happens at far-right, first point
-                # happens at svgStart
-                interp = (d.length - 1) * (x - svgStart) / svgWidth
-                idx = Math.floor(interp)
-                idx2 = idx + 1
-                if idx2 < d.length
-                    u = interp - idx
-                    val = d[idx].y * (1 - u) + d[idx2].y * u
-                else
-                    val = d[idx].y
-                # Non-integers, change to precision if they're less than
-                # a certain amount.  Otherwise, make it by fixed.
-                valStr = val
-                if val != Math.floor(val)
-                    # Val is floating point
-                    if Math.abs(val) > 100
-                        valStr = val.toFixed(1)
-                    else
-                        valStr = val.toPrecision(4)
-                ui.Tooltip.show(d3.event, d[0].title + ", " + valStr)
-            onMouseOut = (d) ->
-                ui.Tooltip.hide()
-
-            relativeToAll = false
-
-            getAreaMethod = () ->
-                useYmax = ymax
-                area = d3.svg.area()
-                    .x((d) -> (d.x - xmin) * width / (xmax - xmin))
-                    .y0((d) -> height - d.y0 * height / useYmax)
-                    .y1((d) -> height - (d.y + d.y0) * height / useYmax)
-                return area
-
-            # First render
-            color = d3.scale.category10()
-            # color = d3.interpolateRgb("#aad", "#556")
-            vis.selectAll("path")
-                .data(stack).enter()
-                    .append("path")
-                    .style("fill", () -> color(Math.random()))
-                    .attr("d", getAreaMethod())
-                    .attr("title", (d, i) -> d[0].title)
-                    .on("mousemove", onMouseOver)
-                    .on("mouseout", onMouseOut)
+            drawGraphArgs = [
+                dataSets
+                @_display
+                tickHeight
+            ]
+            if @config.type == 'area'
+                @_drawGraph_area.apply(@, drawGraphArgs)
+            else if @config.type == 'area-zoom'
+                @_drawGraph_area_zoom.apply(@, drawGraphArgs)
+            else
+                throw "Unknown graph type: " + @config.type
 
             # Remove loaded message
             loadedText.remove()
 
-            redraw = () ->
-                vis.selectAll("path")
-                    .data(stack)
-                    .transition()
-                        .duration(1000)
-                        .attr("d", getAreaMethod())
-
-            $('body').unbind('click').bind('click', () -> redraw())
 
 define(reqs, module)
 

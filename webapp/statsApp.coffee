@@ -19,7 +19,15 @@ callback = (ui, StatsController, Dashboard) ->
             @saver = $('<input type="submit" value="Save" />').appendTo(@)
             @saver.bind("click", () => @saveDash())
 
-            @append('Columns: ')
+            @refresh = $('<input type="submit" value="Refresh" />').appendTo(@)
+            @refresh.bind("click", () => @app.dashboard.refresh())
+
+            @append("show me ")
+            @timeAmt = $('<input type="text" />').appendTo(@)
+            @timeAmt.val('2 weeks')
+            @append(" (hours/days/weeks/years)")
+
+            @append('&nbsp;&nbsp;&nbsp;&nbsp;Columns: ')
             @columnSub = $('<div class="stats-header-button">-</div>')
                 .appendTo(@)
                 .bind("click", () =>
@@ -86,7 +94,7 @@ callback = (ui, StatsController, Dashboard) ->
                             @dashboards.splice(i, 1)
                             break
                     @dashboards.push(newDef)
-                    if $('[value=' + newName + ']', @picker).length == 0
+                    if $('[value="' + newName + '"]', @picker).length == 0
                         @picker.addOption(newName)
                     @picker.select(newName)
                 error: onError
@@ -124,9 +132,11 @@ callback = (ui, StatsController, Dashboard) ->
 
         changeDashboard: (definition) ->
             # Change to the given dashboard
+            oldCols = 2
             if @dashboard?
+                oldCols = @dashboard.container.columns
                 @dashboard.remove()
-            @dashboard = new Dashboard(definition).appendTo(@)
+            @dashboard = new Dashboard(definition, oldCols).appendTo(@)
 
 define(reqs, callback)
 

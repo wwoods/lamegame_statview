@@ -18,7 +18,11 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
             )
 
             @_expandCollapse.bind('click', () =>
-                @_content.toggle()
+                @_content.show()
+                ui.Shade.show(@_content, hide: () =>
+                    ok.trigger("click")
+                    @_content.hide()
+                )
             )
 
             timeDiv = $('<div>Show last </div>')
@@ -26,18 +30,31 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
             # COMMENTED!  Dashboard has an overall time, no need for this
             #@_content.append(timeDiv)
 
+            @type = new ui.ListBox()
+            @type.addOption "area-zoom", "Area Zoomed"
+            @type.addOption "area", "Area"
+            @_content.append(@type)
+
+            @_content.append("Title: ")
+            @title = $('<input type="text" />').appendTo(@_content)
+            @title.css
+                width: '200px'
+            @title.val('(unnamed)')
+
+            @_content.append('<br />')
+
             lb = new ui.ListBox(multiple: true)
             @_content.append(lb)
             for name of @_statsController.stats
                 lb.addOption name
-
-            exprDiv = $('<div>Expression</div>').appendTo(@_content)
-            @expr = $('<input type="text" />').appendTo(exprDiv)
             lb.delegate "option", "click", ->
                 # Not fat arrow, need this from event
                 self.expr.val(self.expr.val() + $(this).val())
                 self.expr.trigger('change')
+                self.expr.focus()
 
+            exprDiv = $('<div>Expression</div>').appendTo(@_content)
+            @expr = $('<textarea></textarea>').appendTo(exprDiv)
             @_statsFound = []
             @expr.bind "change keyup", =>
                 # Re-calculate width of field
@@ -46,7 +63,9 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
                 fake.appendTo('body')
                 w = fake.width()
                 fake.remove()
-                @expr.width(Math.max(100, w) + 'px')
+                @expr.width(Math.min(250, Math.max(100, w)) + 'px')
+                @expr.height(1)
+                @expr.height(Math.max(20, @expr[0].scrollHeight))
                 @updateExpression(@expr.val())
 
             @groupsActive = new ui.Base("<div></div>")
@@ -88,14 +107,16 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
 
             # Populate initial fields from graph
             options = @_graph.config
+            @title.val(options.title)
             @expr.val(options.expr)
             smoother.val(options.smoothOver)
             timeDivAmt.val(options.timeAmt)
-            # Update groups available
-            @expr.trigger("change")
-            # And add the groups we're actually using
-            for grp in options.groups
-                addGroupFilter(grp[0], grp[1])
+            # Update groups available once we're in the dom
+            ui.setZeroTimeout () =>
+                @expr.trigger("change")
+                # And add the groups we're actually using
+                for grp in options.groups
+                    addGroupFilter(grp[0], grp[1])
 
             # Bind refresh button
             ok.bind 'click', () =>
@@ -106,6 +127,8 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
                     groups.push [$(this).text(), filter]
 
                 options =
+                    title: @title.val()
+                    type: @type.val()
                     stats: @_statsFound
                     expr: @expr.val()
                     groups: groups
@@ -115,8 +138,9 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
 
                 @_graph.update options
 
-            if not autoExpand
-                @_content.hide()
+            @_content.hide()
+            if autoExpand
+                @_expandCollapse.trigger("click")
 
 
         updateExpression: (expr) ->

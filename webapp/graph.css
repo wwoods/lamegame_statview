@@ -12,12 +12,36 @@
     border: solid 1px #ddd;
     border-radius: 0.25em;
 }
+.graph-fullscreen {
+    position: fixed;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #fff;
+    padding: 1em;
+    border: solid 20px #fbb;
+    cursor: pointer;
+}
+.graph-fullscreen > * {
+    cursor: auto;
+}
 .graph-overlay {
     position: absolute;
     left: 1.5em;
     top: 0;
     color: #000;
     background-color: #fff;
+}
+.graph-title {
+    display: inline-block;
+    cursor: pointer;
+}
+.graph-title:hover {
+    background-color: #eee;
+}
+.graph-loading-overlay {
+    display: inline-block;
 }
 .graph-render-overlay {
     position: absolute;
@@ -32,5 +56,9 @@
     position: relative;
     /* Prevent scroll bars from showing because of graphs */
     overflow: hidden;
+}
+.graph-display > svg {
+    /* Needed to remove whitespace */
+    display: block;
 }
 
