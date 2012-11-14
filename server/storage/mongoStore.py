@@ -1,5 +1,6 @@
 
 import pymongo
+import re
 
 from server.storage.base import BaseCollection
 

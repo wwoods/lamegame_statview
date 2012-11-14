@@ -199,24 +199,19 @@ callback = (ui, StatsController, Dashboard) ->
             super('<div class="stats-app"></div>')
             self = @
 
-            @_statsController = new StatsController()
-
             @text('Loading, please wait')
             $.ajax(
                 'getStartup'
                 {
                     success: (data) =>
-                        stats = data.stats
-                        window._stats = stats
-                        
                         if data.title?
                             $('title').text(data.title)
 
+                        @_statsController = new StatsController(data.stats)
                         for path in data.paths
                             @_statsController.addStats(path.path, 
                                     path.options)
-
-                        @_statsController.parseStats(stats)
+                        @_statsController.parseStats(@stats)
                         console.log(@_statsController)
 
                         @empty()

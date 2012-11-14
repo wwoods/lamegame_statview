@@ -46,20 +46,33 @@ class MainRoot(object):
             raise ValueError("Unknown source type " + t)
 
         # Do we have storage?
-        if 'storage' in cherrypy.app:
+        if cherrypy.app.get('storage', {}).get('dashboards') is not None:
             url = cherrypy.app['storage']['dashboards']
             if url.startswith('pymongo://'):
                 # Do the import here so pymongo isn't required in places
                 # that are not using it
                 from server.storage.mongoStore import MongoCollection
-                self._storage = MongoCollection(url)
+                self._dashStorage = MongoCollection(url)
             elif url.startswith('shelve://'):
                 from server.storage.shelveStore import ShelveCollection
-                self._storage = ShelveCollection(url)
+                self._dashStorage = ShelveCollection(url)
             else:
                 raise ValueError("Unknown 'dashboards' URL: " + url)
         else:
-            self._storage = None
+            self._dashStorage = None
+
+        if cherrypy.app.get('storage', {}).get('paths') is not None:
+            url = cherrypy.app['storage']['paths']
+            if url.startswith('pymongo://'):
+                from server.storage.mongoStore import MongoCollection
+                self._pathStorage = MongoCollection(url)
+            elif url.startswith('shelve://'):
+                from server.storage.shelveStore import ShelveCollection
+                self._pathStorage = ShelveCollection(url)
+            else:
+                raise ValueError("Unknown 'paths' URL: " + url)
+        else:
+            self._pathStorage = None
 
 
     @cherrypy.expose
@@ -70,10 +83,20 @@ class MainRoot(object):
     @cherrypy.expose
     @cherrypy.config(**{ 'response.headers.Content-Type': 'application/json' })
     def deleteDashboard(self, dashId):
-        if self._storage is None:
+        if self._dashStorage is None:
             return json.dumps(dict(error = "Can't save without storage"))
         
-        self._storage.delete(dashId)
+        self._dashStorage.delete(dashId)
+        return json.dumps(dict(ok = True))
+
+
+    @cherrypy.expose
+    @cherrypy.config(**{ 'response.headers.Content-Type': 'application/json' })
+    def deletePath(self, pathId):
+        if self._pathStorage is None:
+            return json.dumps(dict(error = "Can't save without storage"))
+
+        self._pathStorage.delete(pathId)
         return json.dumps(dict(ok = True))
 
 
@@ -101,7 +124,7 @@ class MainRoot(object):
         stats = self._source.getStats()
         return json.dumps({
             'stats': stats
-            , 'paths': self._sourceConfig['paths'] 
+            , 'paths': self._getPaths()
             , 'dashboards': self._getDashboards()
             , 'title': self._sourceConfig.get('name', 'LameGame StatView')
         })
@@ -110,7 +133,7 @@ class MainRoot(object):
     @cherrypy.expose
     @cherrypy.config(**{ 'response.headers.Content-Type': 'application/json' })
     def saveDashboard(self, dashDef):
-        if self._storage is None:
+        if self._dashStorage is None:
             return json.dumps(dict(error = "Can't save without storage"))
 
         dd = json.loads(dashDef)
@@ -118,16 +141,43 @@ class MainRoot(object):
             raise ValueError("id not found")
         dd['_id'] = dd['id']
         del dd['id']
-        self._storage.save(dd)
+        self._dashStorage.save(dd)
+        return json.dumps(dict(ok = True))
+
+
+    @cherrypy.expose
+    @cherrypy.config(**{ 'response.headers.Content-Type': 'application/json' })
+    def savePath(self, pathDef):
+        if self._pathStorage is None:
+            return json.dumps(dict(error = "Can't save without storage"))
+
+        dd = json.loads(pathDef)
+        if 'id' not in dd:
+            raise ValueError("id not found")
+        dd['_id'] = dd['id']
+        del dd['id']
+        self._pathStorage.save(dd)
         return json.dumps(dict(ok = True))
 
 
     def _getDashboards(self):
         """Return all dashboards as a list"""
-        if self._storage is None:
+        if self._dashStorage is None:
             return []
         # LOAD EVERYTHING!
-        docs = list(self._storage.find())
+        docs = list(self._dashStorage.find())
+        for d in docs:
+            d['id'] = d['_id']
+            del d['_id']
+        return docs
+
+
+    def _getPaths(self):
+        """Return all paths as a list"""
+        if self._pathStorage is None:
+            return self._sourceConfig.get('paths', [])
+
+        docs = list(self._pathStorage.find())
         for d in docs:
             d['id'] = d['_id']
             del d['_id']

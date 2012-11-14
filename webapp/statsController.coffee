@@ -1,6 +1,9 @@
 define [ 'cs!statPath', 'cs!stat' ], (StatPath, Stat) ->
     class StatsController
-        constructor: () ->
+        constructor: (availableStats) ->
+            @availableStats = availableStats
+            @availableStats_doc = """List of stats that are available"""
+
             @stats = {}
             @stats_doc = """{ name: { path: path w/ groups, groups: [ group names ] } }"""
             @groups = {}
@@ -14,9 +17,12 @@ define [ 'cs!statPath', 'cs!stat' ], (StatPath, Stat) ->
             @statPaths.push(statPath)
 
 
-        parseStats: (stats) ->
+        parseStats: () ->
+            ### Re-parse our availableStats list, using our paths.
+            ###
             @allStats = {}
-            for stat in stats
+            @groups = {}
+            for stat in @availableStats
                 @allStats[stat] = true
                 for path in @statPaths
                     result = path.matchStat(stat)
