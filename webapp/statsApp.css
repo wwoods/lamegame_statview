@@ -1,5 +1,14 @@
+.stats-app {
+	/* Header is fixed, but make room for it */
+	padding-top: 2em;
+}
+
 .stats-header {
-    position: relative;
+    position: fixed;
+    z-index: 1;
+    top: 0;
+    left: 0;
+    right: 0;
     height: 2em;
     background-color: #eee;
     border-bottom: 1px solid #ddd;

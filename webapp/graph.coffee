@@ -535,7 +535,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                     .attr("d", getAreaMethod())
                     .on("mousemove", (d) =>
                         val = @_eventInterp(d)
-                        ui.Tooltip.show(d3.event, d.title + ': ' + val)
+                        valStr = @_formatValue(val)
+                        ui.Tooltip.show(d3.event, d.title + ': ' + valStr)
                     )
                     .on("mouseout", () -> ui.Tooltip.hide())
 
@@ -652,7 +653,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                         .attr("d", area)
                         .on("mousemove", (d) =>
                             val = @_eventInterp(d)
-                            ui.Tooltip.show(d3.event, d.title + ': ' + val)
+                            valStr = @_formatValue(val)
+                            ui.Tooltip.show(d3.event, d.title + ': ' + valStr)
                         )
                         .on("mouseout", () => ui.Tooltip.hide())
                         .on("click", (d, di) =>
@@ -693,28 +695,59 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                         )
 
             # Draw the overall trend graph
-            stackn = d3.layout.stack().offset('zero')([ combined ])
+            # Split combined into combinedp and combinedn - positive and 
+            # negative values, respectively.
+            combinedp = []
+            combinedn = []
+            realMax = Math.max(ymax, Math.abs(ymin))
+            for val in combined
+                fake = $.extend({}, val)
+                fake.y = 0
+                if val.y >= 0
+                    combinedp.push(val)
+                    combinedn.push(fake)
+                else
+                    combinedn.push(val)
+                    combinedp.push(fake)
             visn = d3.select(@__areaZoomContainer[0]).append('svg')
             visn.attr('width', width).attr('height', trendHeight - 1)
             $(visn[0]).css('border-top', 'solid 1px #444')
             color = Graph.colors
             visn.selectAll("path")
-                .data(stackn).enter()
+                .data([ combinedp, combinedn ]).enter()
                     .append("path")
-                    .style("fill", (d) -> color(d.title))
+                    .style("fill", (d) => 
+                            c = color(combined.title)
+                            if d == combinedn
+                                # Slightly lighter
+                                r = parseInt(c[1..2], 16)
+                                g = parseInt(c[3..4], 16)
+                                b = parseInt(c[5..6], 16)
+                                r += (255 - r) * 0.3
+                                g += (255 - g) * 0.3
+                                b += (255 - b) * 0.3
+                                c = @_getColorHex(r, g, b)
+                            return c
+                        )
                     .attr(
                         "d"
                         d3.svg.area()
                             .x((d) -> (d.x - xmin) * width / (xmax - xmin))
-                            .y0((d) -> trendHeight * (1.0 - d.y / ymax))
+                            .y0((d) -> trendHeight * (1.0 - Math.abs(d.y) / 
+                                    realMax))
                             .y1((d) -> trendHeight)
                     )
                     .on("mousemove", (d) =>
-                        text = d.title + ': '
-                        text += @_eventInterp(d)
+                        text = combined.title + ': '
+                        text += @_formatValue(@_eventInterp(d))
                         for key, ds of layerData.subgroups
-                            text += '<br/>' + ds.title + ': '
-                            text += @_eventInterp(ds.getGraphPoints())
+                            r = @_eventInterp(ds.getGraphPoints())
+                            if Math.abs(r) < (ymax - ymin) / height / 2 and
+                                    Math.abs(r) < 0.001
+                                # Insignificant value
+                                continue
+                            valStr = @_formatValue(r)
+                            text += '<br/>' + ds.title + ': ' + valStr
                         ui.Tooltip.show(d3.event, text)
                     )
                     .on("mouseout", () => ui.Tooltip.hide())
@@ -727,7 +760,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
 
         _eventInterp: (dataSet) ->
             ### Use d3.event to interpolate our position in the dataSet, and
-            return a string representing the value at this point.
+            return the interpolated value at this point.
             ###
             x = d3.event.pageX
             svgStart = @_display.offset().left
@@ -742,7 +775,14 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                 val = dataSet[idx].y * (1 - u) + dataSet[idx2].y * u
             else
                 val = dataSet[idx].y
-
+                
+            return val
+            
+            
+        _formatValue: (val) ->
+            ### Take a value and format it so it's easier to read
+            ###
+            
             # Non-integers, change to precision if they're less than
             # a certain amount.  Otherwise, make it by fixed.
             isNeg = (val < 0)
@@ -767,9 +807,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
         _getColorHex: (r, g, b) ->
             ### Given three numbers from 0-255, return "#abcdef" style string
             ###
-            rs = r.toString(16)
-            gs = g.toString(16)
-            bs = b.toString(16)
+            rs = Math.floor(r).toString(16)
+            gs = Math.floor(g).toString(16)
+            bs = Math.floor(b).toString(16)
             if rs.length < 2
                 rs = "0" + rs
             if gs.length < 2
@@ -926,7 +966,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                         # This stat doesn't have our next group, so stop here
                         break
                     if not (nextValue of dataOutput.subgroups)
-                        nextTitle = "#{ dataOutput.title } - #{ nextValue }"
+                        nextTitle = "#{ next[0] }: #{ nextValue }"
                         dataOutput.subgroups[nextValue] = new DataGroup(
                                 nextTitle, calculateOptions)
                     dataOutput = dataOutput.subgroups[nextValue]

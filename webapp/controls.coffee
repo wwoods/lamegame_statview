@@ -19,6 +19,12 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
 
             @_expandCollapse.bind('click', () =>
                 @_content.show()
+                
+                @expr.trigger("change")
+                # And add the groups we're actually using
+                for grp in options.groups
+                    addGroupFilter(grp[0], grp[1])
+                    
                 ui.Shade.show(@_content, hide: () =>
                     ok.trigger("click")
                     @_content.hide()
@@ -121,12 +127,8 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
             @expr.val(options.expr)
             smoother.val(options.smoothOver)
             timeDivAmt.val(options.timeAmt)
-            # Update groups available once we're in the dom
-            ui.setZeroTimeout () =>
-                @expr.trigger("change")
-                # And add the groups we're actually using
-                for grp in options.groups
-                    addGroupFilter(grp[0], grp[1])
+            # Wait to trigger expr change and update groups available until
+            # we're in the dom and visible (in @_expandCollapseButton)
 
             # Bind refresh button
             ok.bind 'click', () =>
