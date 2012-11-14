@@ -208,6 +208,9 @@ callback = (ui, StatsController, Dashboard) ->
                     success: (data) =>
                         stats = data.stats
                         window._stats = stats
+                        
+                        if data.title?
+                            $('title').text(data.title)
 
                         for path in data.paths
                             @_statsController.addStats(path.path, 

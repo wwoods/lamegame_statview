@@ -103,6 +103,7 @@ class MainRoot(object):
             'stats': stats
             , 'paths': self._sourceConfig['paths'] 
             , 'dashboards': self._getDashboards()
+            , 'title': self._sourceConfig.get('name', 'LameGame StatView')
         })
 
 
