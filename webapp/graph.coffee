@@ -1,5 +1,6 @@
-reqs = [ 'cs!lib/ui', 'cs!stat', 'cs!controls', 'css!graph' ]
-module = (ui, Stat, Controls) ->
+reqs = [ 'cs!lib/ui', 'cs!stat', 'cs!controls', 'cs!dataset', 'cs!datagroup',
+        'css!graph' ]
+module = (ui, Stat, Controls, DataSet, DataGroup) ->
     class Graph extends ui.Base
         constructor: (config) ->
             super('<div class="graph"></div>')
@@ -343,19 +344,19 @@ module = (ui, Stat, Controls) ->
 
             # Done!
             return result
-
-
+        
+        
         _drawAxis: (options) ->
             tickHeight = options.tickHeight
-            dataSets = options.dataSets
+            pointTimes = options.pointTimes
             display = options.display
 
             width = display.width()
             height = display.height()
 
-            xmin = dataSets[0][0].x
-            xmax = dataSets[0][dataSets[0].length - 1].x
-            xcount = dataSets[0].length
+            xmin = pointTimes[0]
+            xmax = pointTimes[pointTimes.length - 1]
+            xcount = pointTimes.length
             intervalMax = xmax
             intervalLength = 60
             ticks = width / 40
@@ -530,118 +531,177 @@ module = (ui, Stat, Controls) ->
             vis.selectAll("path")
                 .data(stacks).enter()
                     .append("path")
-                    .style("fill", (d) -> color(d[0].title))
+                    .style("fill", (d) -> color(d.title))
                     .attr("d", getAreaMethod())
                     .on("mousemove", (d) =>
                         val = @_eventInterp(d)
-                        ui.Tooltip.show(d3.event, d[0].title + ': ' + val)
+                        ui.Tooltip.show(d3.event, d.title + ': ' + val)
                     )
                     .on("mouseout", () -> ui.Tooltip.hide())
 
 
-        _drawGraph_area_zoom: (dataSets, display, height) ->
+        _drawGraph_areaZoom: (data, display, height) ->
+            ### Draw an area_zoom graph of data in display with height.
+            
+            data -- DataGroup representing the base values
+            ###
+            layers = [ [ data, null ] ]
+            @__areaZoomContainer = $([])
+            @_drawGraph_areaZoom_layer(layers, display, height)
+            
+            
+        _drawGraph_areaZoom_layer: (layers, display, height) ->
+            ### Draw the next layer of an area_zoom.  Essentially, for now, 
+            wipe display and re-draw the top layer
+            ###
+            @__areaZoomContainer.remove()
+            @__areaZoomContainer = $('<div></div>').appendTo(display)
+            
             width = display.width()
-            xmin = dataSets[0][0].x
-            xmax = dataSets[0][dataSets[0].length - 1].x
-            relativeToAll = false
-
-            # Pixels height for the overall trend graph
-            trendHeight = height * 0.3 
-
-            combined = []
-            for dp in dataSets[0]
-                # Copy each object, since values are modified
-                combined.push($.extend({}, dp))
-            for ds in dataSets[1..]
-                for pt, i in ds
-                    combined[i].y += pt.y
+            [layerData, detailStackOrder] = layers[layers.length - 1]
+            
+            # Get combined before bothering with details view, since we need
+            # xmin and xmax
+            combined = layerData.getGraphPoints()
             console.log("combined")
             console.log(combined)
-            ymax = combined.reduce(
-                (last, d) -> Math.max(d.y, last)
-                0
-            )
-
-            # 100% expand render - remap points to [0..1] based on portion of
-            # combined
-            for i in [0...dataSets[0].length]
-                for ds in dataSets
-                    # If this layer is imperceptible, set ynorm to 0
-                    if combined[i].y < ymax / (2*height) and combined[i].y < 1
-                        ds[i].ynorm = 0
-                    else
-                        ds[i].ynorm = ds[i].y / combined[i].y
-
-            # d3.layout.stack() adds the "y0" property to dataSets, and stacks 
-            # them
-            stacksGen = d3.layout.stack().offset('zero')
-                .y((d) -> d.ynorm)
-                .out (d, y0, y) ->
-                    d.y0 = y0
-            stacks = stacksGen(dataSets)
-            stackOrder = [0...dataSets.length]
-
-            # Draw the proportional bit
-            vis = d3.select(display[0]).append('svg')
-            visHeight = height - trendHeight
-            vis.attr('width', width).attr('height', visHeight)
             
-            self = @
-            color = Graph.colors
-            area = d3.svg.area()
-            area
-                .x((d) -> (d.x - xmin) * width / (xmax - xmin))
-                .y0((d) -> visHeight - d.y0 * visHeight)
-                .y1((d) -> visHeight - (d.ynorm + d.y0) * visHeight)
-            vis.selectAll("path")
-                .data(stacks).enter()
-                    .append("path")
-                    .style("fill", (d) -> color(d[0].title))
-                    .attr("d", area)
-                    .on("mousemove", (d) =>
-                        val = @_eventInterp(d)
-                        ui.Tooltip.show(d3.event, d[0].title + ': ' + val)
-                    )
-                    .on("mouseout", () -> ui.Tooltip.hide())
-                    .on("click", (d, di) =>
-                        console.log(arguments)
-                        console.log(stackOrder)
+            { xmin, xmax, ymin, ymax } = combined.getBounds()
 
-                        # Remove current stackOrder == di and put it at 0
-                        # Swap current 0 with stackOrder == di
-                        diPos = -1
-                        for q, j in stackOrder
-                            if q == di
-                                diPos = j
-                                break
+            # Pixels height for the overall trend graph
+            trendHeight = height
+            
+            if not $.compareObjs({}, layerData.subgroups)
+                # We have a 100% expand render to draw; reduce overall trend
+                # to 30% height
+                trendHeight *= 0.3
+                
+                # Come up with a list of dataSets
+                subgroupSets = []
+                for key, subgroup of layerData.subgroups
+                    subgroupSets.push(subgroup.getGraphPoints())
 
-                        stackOrder = stackOrder[...diPos].concat(
-                            stackOrder[diPos + 1..])
-                        stackOrder.unshift(di)
-                        
-                        # Run the d3.layout.stack on a sorted version of our
-                        # dataSets
-                        toStack = []
-                        for i in stackOrder
-                            toStack.push(dataSets[i])
-                        stacks = stacksGen(toStack)
-                        vis.selectAll("path")
-                            .data(dataSets)
-                            .transition()
-                                .duration(1000)
-                                .attr("d", area)
-                    )
+                # 100% expand render - remap points to [0..1] based on portion 
+                # of _the absolute value_ of combind subgroups
+                absCombined = []
+                absCombinedMax = 0.0
+                for i in [0...subgroupSets[0].length]
+                    # Calculate the total "effect" here...
+                    absVal = 0
+                    for ds in subgroupSets
+                        absVal += Math.abs(ds[i].y)
+                    absCombined[i] = absVal
+                    absCombinedMax = Math.max(absCombinedMax, absVal)
+                    
+                for i in [0...subgroupSets[0].length]
+                    # And now calculate the normalized "ynorm" component for
+                    # each subgroup
+                    for ds in subgroupSets
+                        # If this layer is imperceptible, set ynorm to 0
+                        av = Math.abs(ds[i].y)
+                        if ds[i].y == 0 or
+                                absCombined[i] < absCombinedMax / (2*height)
+                            ds[i].ynorm = 0
+                        else
+                            ds[i].ynorm = Math.abs(ds[i].y) / absCombined[i]
+    
+                # d3.layout.stack() adds the "y0" property to dataSets, and 
+                # stacks them
+                stacksGen = d3.layout.stack().offset('zero')
+                    .y((d) -> d.ynorm)
+                    .out (d, y0, y) ->
+                        d.y0 = y0
+                
+                # We offer click-to-level functionality, since it can be hard
+                # to tell the trend of any individual element if it doesn't 
+                # have an edge that's a horizontal line
+                if detailStackOrder?
+                    stackOrder = detailStackOrder
+                else
+                    stackOrder = [0...subgroupSets.length]
+                    
+                restackData = () =>
+                    # Run the d3.layout.stack on a sorted version of our
+                    # subgroupSets; it's nice to keep the order that
+                    # we pass them to the visualization the same so 
+                    # that the same colors represent the same objects
+                    toStack = []
+                    for i in stackOrder
+                        toStack.push(subgroupSets[i])
+                    return stacksGen(toStack)
+                    
+                # Perform first stack
+                restackData()
+    
+                # Draw the proportional bit
+                vis = d3.select(@__areaZoomContainer[0]).append('svg')
+                visHeight = height - trendHeight
+                vis.attr('width', width).attr('height', visHeight)
+                
+                self = @
+                color = Graph.colors
+                area = d3.svg.area()
+                area
+                    .x((d) -> (d.x - xmin) * width / (xmax - xmin))
+                    .y0((d) -> visHeight - d.y0 * visHeight)
+                    .y1((d) -> visHeight - (d.ynorm + d.y0) * visHeight)
+                vis.selectAll("path")
+                    .data(subgroupSets).enter()
+                        .append("path")
+                        .style("fill", (d) -> color(d.title))
+                        .attr("d", area)
+                        .on("mousemove", (d) =>
+                            val = @_eventInterp(d)
+                            ui.Tooltip.show(d3.event, d.title + ': ' + val)
+                        )
+                        .on("mouseout", () => ui.Tooltip.hide())
+                        .on("click", (d, di) =>
+                            console.log(arguments)
+                            console.log(stackOrder)
+                            
+                            if di == stackOrder[0]
+                                # Already at the bottom, zoom in
+                                # Write out our current stackOrder to our
+                                # layer so that when it's restored, it will be
+                                # sorted like it was before
+                                layers[layers.length - 1][1] = stackOrder
+                                
+                                # Push a new layer and re-render
+                                layers.push([ d.group, null ])
+                                @_drawGraph_areaZoom_layer(layers, display,
+                                        height)
+                                return
+    
+                            # Remove current stackOrder == di and put it at 0
+                            # Swap current 0 with stackOrder == di
+                            diPos = -1
+                            for q, j in stackOrder
+                                if q == di
+                                    diPos = j
+                                    break
+    
+                            stackOrder = stackOrder[...diPos].concat(
+                                stackOrder[diPos + 1..])
+                            stackOrder.unshift(di)
+                            
+                            restackData()
+                            vis.selectAll("path")
+                                .data(subgroupSets)
+                                .transition()
+                                    .duration(1000)
+                                    .attr("d", area)
+                        )
 
             # Draw the overall trend graph
             stackn = d3.layout.stack().offset('zero')([ combined ])
-            visn = d3.select(display[0]).append('svg')
+            visn = d3.select(@__areaZoomContainer[0]).append('svg')
             visn.attr('width', width).attr('height', trendHeight - 1)
             $(visn[0]).css('border-top', 'solid 1px #444')
             color = Graph.colors
             visn.selectAll("path")
                 .data(stackn).enter()
                     .append("path")
-                    .style("fill", (d) -> color(d[0].title))
+                    .style("fill", (d) -> color(d.title))
                     .attr(
                         "d"
                         d3.svg.area()
@@ -650,14 +710,19 @@ module = (ui, Stat, Controls) ->
                             .y1((d) -> trendHeight)
                     )
                     .on("mousemove", (d) =>
-                        text = 'Combined: '
+                        text = d.title + ': '
                         text += @_eventInterp(d)
-                        for ds in dataSets
-                            text += '<br/>' + ds[0].title + ': '
-                            text += @_eventInterp(ds)
+                        for key, ds of layerData.subgroups
+                            text += '<br/>' + ds.title + ': '
+                            text += @_eventInterp(ds.getGraphPoints())
                         ui.Tooltip.show(d3.event, text)
                     )
-                    .on("mouseout", () -> ui.Tooltip.hide())
+                    .on("mouseout", () => ui.Tooltip.hide())
+                    .on("click", () =>
+                        if layers.length > 1
+                            layers.pop()
+                            @_drawGraph_areaZoom_layer(layers, display, height)
+                    )
 
 
         _eventInterp: (dataSet) ->
@@ -797,36 +862,6 @@ module = (ui, Stat, Controls) ->
                 pointTimes.unshift(lastPoint)
                 lastPoint -= pointDiff
 
-            data = { values: {} }
-            for dataSet in dataSetsRaw
-                dataSetData = self._aggregateSourceData(dataSet, pointTimes,
-                        timeFrom)
-                dataSetName = dataSetData.stat.name
-                myGroups = self.config.groups.slice()
-                dataOutput = data
-                while true
-                    # Merge at this level
-                    if not (dataSetName of dataOutput.values)
-                        dataOutput.values[dataSetName] = (
-                                dataSetData.values.slice())
-                    else
-                        valuesOut = dataOutput.values[dataSetName]
-                        for valueOut, j in dataSetData.values
-                            valuesOut[j] += valueOut
-
-                    # Look for the next group that needs the data
-                    next = myGroups.shift()
-                    if next == undefined
-                        break
-                    nextValue = dataSetData.groups[next[0]]
-                    if nextValue == undefined
-                        # This stat doesn't have our next group, so stop here
-                        break
-                    if not (nextValue of dataOutput)
-                        dataOutput[nextValue] = { values: {} }
-                    dataOutput = dataOutput[nextValue]
-            console.log(data)
-
             # JS Sandbox
             # Thanks to http://stackoverflow.com/questions/543533/restricting-eval-to-a-narrow-scope
             getMaskedEval = (scr) ->
@@ -847,42 +882,58 @@ module = (ui, Stat, Controls) ->
                     for p of ctx
                         mask[p] = ctx[p]
                     return fn.call(mask)
-
-            # ================== ADAPTER CODE ==================
-            dataSets = []
-
+                    
             # Compile expr
             expr = self.config.expr
             for s, q in stats
                 newName = 'v' + q
                 expr = expr.replace(s.name, newName)
             myFn = getMaskedEval(expr)
-            
-            # Run expr to get each point
-            for groupVal of data
-                dataSet = data[groupVal]
-                if groupVal == 'values'
-                    if self.config.groups.length != 0
-                        # We have data to display, don't include "values"
-                        continue
-                    dataSet = data
-                
-                s1 = stats[0].name
-                newValues = []
-                for j in [0...dataSet.values[s1].length]
-                    ctx = {}
-                    for s, q in stats
-                        vals = dataSet.values[s.name]
-                        ctx['v' + q] = vals[j]
-                    result = myFn(ctx)
-                    newValues.push(
-                        x: pointTimes[j]
-                        y: result
-                        title: groupVal
-                    )
-                dataSets.push(newValues)
+            calculateOptions =
+                fn: myFn
+                stats: stats
+                pointTimes: pointTimes
 
-            #-------------- OLD (relevant) CODE -------------------
+            data = new DataGroup(self.config.title, calculateOptions)
+            for dataSet in dataSetsRaw
+                # For each of the returned data sets, nest it in our "totals"
+                # data set according to the groups we've been asked to divide
+                # across
+                dataSetData = self._aggregateSourceData(dataSet, pointTimes,
+                        timeFrom)
+                dataSetName = dataSetData.stat.name
+                myGroups = self.config.groups.slice()
+                dataOutput = data
+                while true
+                    # Merge into current DataGroup
+                    if not (dataSetName of dataOutput.values)
+                        # There is no existing data at this level; do a copy
+                        dataOutput.values[dataSetName] = (
+                                dataSetData.values.slice())
+                    else
+                        # There is existing data at this level; do a merge
+                        valuesOut = dataOutput.values[dataSetName]
+                        for valueOut, j in dataSetData.values
+                            valuesOut[j] += valueOut
+
+                    # Look for the next group that needs the data
+                    next = myGroups.shift()
+                    if next == undefined
+                        # No more groups, all done
+                        break
+                    nextValue = dataSetData.groups[next[0]]
+                    if nextValue == undefined
+                        # This stat doesn't have our next group, so stop here
+                        break
+                    if not (nextValue of dataOutput.subgroups)
+                        nextTitle = "#{ dataOutput.title } - #{ nextValue }"
+                        dataOutput.subgroups[nextValue] = new DataGroup(
+                                nextTitle, calculateOptions)
+                    dataOutput = dataOutput.subgroups[nextValue]
+            console.log("data")
+            console.log(data)
+
+            # ---- Draw the graph ----
             tickHeight = 20
             
             # Render title
@@ -903,33 +954,33 @@ module = (ui, Stat, Controls) ->
 
             @_drawAxis
                 tickHeight: tickHeight
-                dataSets: dataSets
+                pointTimes: pointTimes
                 display: @_display
 
             display = self._display
             width = display.width()
             height = display.height() - tickHeight - _title.height()
 
-            xmin = dataSets[0][0].x
-            xmax = dataSets[0][dataSets[0].length - 1].x
-
-            console.log("dataSets")
-            console.log(dataSets)
             drawGraphArgs = [
-                dataSets
+                data
                 @_display
                 height
             ]
             if @config.type == 'area'
                 @_drawGraph_area.apply(@, drawGraphArgs)
             else if @config.type == 'area-zoom'
-                @_drawGraph_area_zoom.apply(@, drawGraphArgs)
+                @_drawGraph_areaZoom.apply(@, drawGraphArgs)
             else
                 throw "Unknown graph type: " + @config.type
 
             # Remove loaded message
             loadedText.remove()
             
+    # d3.scale.category20 does something cool - it returns a method that gives
+    # you a color from a rotating list of 20.  What's cool is that it keeps
+    # a map of values it has seen before - that is, if we keep a global
+    # category20 instance on Graph, then any graphed value will always have
+    # the exact same color in all of our graphs.  Yay!
     Graph.colors = d3.scale.category20()
     return Graph
 
