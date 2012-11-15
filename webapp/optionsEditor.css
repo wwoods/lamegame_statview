@@ -1,0 +1,12 @@
+
+.options-editor {
+}
+
+.options-editor table td {
+	padding-right: 0.5em;
+}
+
+.options-editor .header {
+	font-size: 1.3em;
+	padding-top: 0.3em;
+}

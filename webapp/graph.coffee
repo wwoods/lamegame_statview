@@ -191,6 +191,11 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             if timeAmt == ''
                 timeAmt = ui.fromDom(@closest('.dashboard')).getTimeAmt()
             timeFrom = timeTo - self.parseInterval(timeAmt)
+            
+            # Update _sanitize
+            @_sanitize = false
+            if @uiClosest('.dashboard').getSanitize()
+                @_sanitize = true
 
             $.ajax('getData', {
                 type: 'POST'
@@ -636,13 +641,32 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                             subgroupSets)
                 else
                     throw "Invalid render zoom type - " + zoomType
+                    
+            # Figure out the graphable ymax
+            realMax = Math.max(ymax, Math.abs(ymin))
+                    
+            # Do we need to clamp ymax / ymin?
+            if @_sanitize
+                # Use 2 standard deviations for cap
+                sum = 0.0
+                count = combined.length
+                for val in combined
+                    sum += Math.abs(val.y)
+                avg = sum / count
+                stddev = 0.0
+                for val in combined
+                    stddev += Math.pow(Math.abs(val.y) - avg, 2)
+                stddev = Math.sqrt(stddev / count)
+                topStddev = avg + stddev * 2
+                if topStddev < realMax
+                    isCapped = true
+                    realMax = topStddev
 
             # Draw the overall trend graph
             # Split combined into combinedp and combinedn - positive and 
             # negative values, respectively.
             combinedp = []
             combinedn = []
-            realMax = Math.max(ymax, Math.abs(ymin))
             for val in combined
                 fake = $.extend({}, val)
                 fake.y = 0
@@ -653,15 +677,24 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                     combinedn.push(val)
                     combinedp.push(fake)
             visn = d3.select(@__zoomContainer[0]).append('svg')
-            $('<div class="graph-display-label-max"></div>')
+            magLabel = $('<div class="graph-display-label-max"></div>')
                 .text(@_formatValue(realMax))
                 .insertBefore(visn[0])
+            if isCapped
+                magLabel.css('color', '#f44')
             visn.attr('width', width).attr('height', trendHeight - 1)
             $(visn[0]).css('border-top', 'solid 1px #444')
             
             # Fix divide by zero (after filling out graph-label-max)
             if realMax == 0
                 realMax = 1
+                
+            # Coffee-script workaround... should look at why this can't be
+            # inlined.
+            y0Get = (d) ->
+                # Sanitize can mean > 1.0 results here
+                pt = Math.min(1.0, Math.abs(d.y) / realMax)
+                return trendHeight * (1.0 - pt)
             
             visn.selectAll("path")
                 .data([ combinedp, combinedn ]).enter()
@@ -677,8 +710,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                         "d"
                         d3.svg.area()
                             .x((d) -> (d.x - xmin) * width / (xmax - xmin))
-                            .y0((d) -> trendHeight * (1.0 - Math.abs(d.y) / 
-                                    realMax))
+                            .y0(y0Get)
                             .y1((d) -> trendHeight)
                     )
                     .on("mousemove", (d) =>
@@ -855,10 +887,33 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             for i in [0...subgroupSets[0].length]
                 for ds in subgroupSets
                     ymax = Math.max(ymax, Math.abs(ds[i].y))
+                    
+            # Do we need to clamp ymax?
+            if @_sanitize
+                # Use 2 standard deviations for cap
+                sum = 0.0
+                count = 0
+                for i in [0...subgroupSets[0].length]
+                    for ds in subgroupSets
+                        sum += Math.abs(ds[i].y)
+                        count += 1
+                avg = sum / count
+                stddev = 0.0
+                for i in [0...subgroupSets[0].length]
+                    for ds in subgroupSets
+                        stddev += Math.pow(Math.abs(ds[i].y) - avg, 2)
+                stddev = Math.sqrt(stddev / count)
+                topStddev = avg + stddev * 2
+                if topStddev < ymax
+                    ymax = topStddev
+                    isCapped = true
                 
-            $('<div class="graph-display-label-max"></div>')
+            # Draw our magnitude label
+            magLabel = $('<div class="graph-display-label-max"></div>')
                 .text(@_formatValue(ymax))
                 .insertBefore(detailVis[0])
+            if isCapped
+                magLabel.css('color', '#f44')
                     
             # Fix the error case
             if ymax == 0
@@ -872,10 +927,13 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                 for ds in subgroupSets
                     ds[i].ynormp = 0.0
                     ds[i].ynormn = 0.0
+                    # We have to clamp val here, since sanitize may have 
+                    # changed the render range
+                    val = Math.min(1, Math.abs(ds[i].y) / ymax)
                     if ds[i].y > 0
-                        ds[i].ynormp = ds[i].y / ymax
+                        ds[i].ynormp = val
                     else
-                        ds[i].ynormn = -ds[i].y / ymax
+                        ds[i].ynormn = val
 
             # Draw the proportional bit
             normWidth = '2px'

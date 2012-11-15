@@ -1,4 +1,4 @@
-define ["cs!lib/ui"], (ui) ->
+define ["cs!lib/ui", "css!optionsEditor"], (ui) ->
     class FilterRow extends ui.Base
         constructor: (group, editor) ->
             @group = group
@@ -49,17 +49,20 @@ define ["cs!lib/ui"], (ui) ->
                 @values.addOption(v)
 
 
-    class FilterEditor extends ui.Dialog
+    class OptionsEditor extends ui.Dialog
         constructor: (options) ->
             ### filters is a dict: { group: [ allowed values ] }
             ###
             @options = options
+            @sanitizeHolder = options.sanitizeHolder
             @filters = options.filters
-            @_initFilters = $.extend(true, {}, @filters)
+            @_initSettings = 
+                filters: $.extend(true, {}, @filters)
+                sanitize: @sanitizeHolder.sanitize
             @statsController = options.statsController
             
-            body = $('<div class="filter-editor"></div>')
-            body.append("<div>Filters</div>")
+            body = $('<div class="options-editor"></div>')
+            body.append('<div class="header">Filters</div>')
             
             @filterRows = $('<table class="filter-rows"></table>')
                 .appendTo(body)
@@ -69,6 +72,23 @@ define ["cs!lib/ui"], (ui) ->
             allGroups.sort()
             for g in allGroups
                 @filterRows.append(new FilterRow(g, @))
+                
+            body.append('<div class="header">Misc Options</div>')
+            sanDiv = $('<div></div>').appendTo(body)
+            @sanitizer = $('<input type="checkbox" />').appendTo(sanDiv)
+            if @sanitizeHolder.sanitize
+                @sanitizer.attr('checked', true)
+            sanTip = $("<span>Sanitize graphs</span>").appendTo(sanDiv)
+            sanTip.add(@sanitizer)
+                .bind("mouseover", (e) -> ui.Tooltip.show(e, """Sanitize the 
+                        range
+                        of graphs when graphing large values - for instance,
+                        if 99% of values are of the range 10, but there's
+                        a few values that are in the range of 1000000, then
+                        clamp the graph to something like [0, 12] and "flatten"
+                        the extreme point.  The tooltip will still show real
+                        values."""))
+                .bind("mouseout", () -> ui.Tooltip.hide())
             
             super(body: body)
             
@@ -76,9 +96,14 @@ define ["cs!lib/ui"], (ui) ->
         remove: () ->
             ### Save our filters
             ###
+            @sanitizeHolder.sanitize = @sanitizer.is(':checked')
             @_refreshFilters()
-            if not $.compareObjs(@filters, @_initFilters) and @options.onChange
-                @options.onChange()
+            newSettings =
+                filters: @filters
+                sanitize: @sanitizeHolder.sanitize
+            if not $.compareObjs(newSettings, @_initSettings)
+                if @options.onChange?
+                    @options.onChange()
             super()
             
             

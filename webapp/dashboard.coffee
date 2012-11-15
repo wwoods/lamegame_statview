@@ -140,6 +140,10 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
                     continue
                 result.graphs.push($.extend({}, g.config))
             return result
+            
+            
+        getSanitize: () ->
+            return ui.fromDom('.stats-header').sanitize
 
 
         getTimeAmt: () ->

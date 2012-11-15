@@ -1,6 +1,6 @@
 reqs = [ "cs!lib/ui", "cs!statsController", "cs!dashboard", "cs!statPathEditor", 
-        "cs!filterEditor", "js-hash/Hash", "css!statsApp" ]
-callback = (ui, StatsController, Dashboard, StatPathEditor, FilterEditor, 
+        "cs!optionsEditor", "js-hash/Hash", "css!statsApp" ]
+callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor, 
         Hash) ->
     class StatsHeader extends ui.Base
         constructor: (app, dashboards) ->
@@ -38,14 +38,17 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, FilterEditor,
             @append(" (hours/days/weeks/years)")
             
             @append('&nbsp;&nbsp;&nbsp;&nbsp;')
+            @sanitize = false
             @globalFilters = {}
             @globalFilters_doc = "Dict of filters: { group: [ values ] }"
-            @filters = new ui.Base('<input type="submit" value="Filters" />')
+            @optionsEdit = new ui.Base(
+                    '<input type="submit" value="Options / Filters" />')
                 .appendTo(@)
                 .bind("click", () =>
-                    new FilterEditor(
+                    new OptionsEditor(
                         filters: @globalFilters
                         statsController: @app._statsController
+                        sanitizeHolder: @
                         onChange: () => @refresh.trigger("click")
                     )
                 )
@@ -158,6 +161,8 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, FilterEditor,
             viewDef =
                 view: @picker.val()
                 timeAmt: @timeAmt.val()
+            if @sanitize
+                viewDef.sanitize = true
             if not $.compareObjs({}, @globalFilters)
                 viewDef.filters = @globalFilters
             Hash.update(JSON.stringify(viewDef))
@@ -332,6 +337,10 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, FilterEditor,
                         @header.globalFilters = obj.filters
                     else
                         @header.globalFilters = {}
+                    if obj.sanitize
+                        @header.sanitize = true
+                    else
+                        @header.sanitize = false
                     @header.picker.select(obj.view)
                 else
                     throw "Unknown hash: " + hash
