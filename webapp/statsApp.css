@@ -1,3 +1,11 @@
+body {
+	/* Browsers don't send a window resize event when a scrollbar is added,
+	and we also don't want to keep re-sizing if there's e.g. a tooltip
+	that goes into and out of the bottom of the window.
+	*/
+	overflow-y: scroll;
+}
+
 .stats-app {
 	/* Header is fixed, but make room for it */
 	padding-top: 2em;
