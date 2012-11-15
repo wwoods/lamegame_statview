@@ -68,7 +68,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                 throw "Invalid interval: " + interval
 
 
-        parseStats: (expr) ->
+        parseStats: (expr, errorOnUndefined = false) ->
             ### Parse an expression for stats, return array of stats used
             ###
             statsFound = []
@@ -79,8 +79,13 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                     if /Math\./.test(next[0])
                         # Math expression, OK to skip
                         continue
-                    new ui.Dialog(body: "Cannot find stat '#{ next[0] }'")
-                    throw "Invalid expression: #{ expr }"
+                    
+                    if errorOnUndefined
+                        new ui.Dialog(body: "Cannot find stat '#{ next[0] }'")
+                        throw "Invalid expression: #{ expr }"
+                        
+                    # Probably just parsing as they type, no need to raise
+                    continue
 
                 statsFound.push(stat)
             return statsFound
@@ -116,7 +121,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             else
                 self._autoRefreshNext = null
 
-            stats = self.parseStats(self.config.expr)
+            stats = self.parseStats(self.config.expr, true)
 
             # Copy the groups array
             groups = self.config.groups[..]
@@ -793,6 +798,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             nval = Math.abs(val)
             if nval == 0
                 valStr = '0'
+            else if nval > 1000000000
+                valStr = (nval / 1000000000.0).toPrecision(3) + 'G'
             else if nval > 1000000
                 valStr = (nval / 1000000.0).toPrecision(3) + 'M'
             else if nval > 1000
@@ -932,7 +939,14 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             for s, q in stats
                 newName = 'v' + q
                 expr = expr.replace(s.name, newName)
-            myFn = getMaskedEval(expr)
+            try
+                myFn = getMaskedEval(expr)
+            catch e
+                message = $("<div>Invalid Expression: 
+                        <div>#{ self.config.expr }</div>
+                        <div style='color:#f88'>#{ e }</div></div>")
+                new ui.Dialog(body: message)
+                throw e
             calculateOptions =
                 fn: myFn
                 stats: stats

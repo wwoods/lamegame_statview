@@ -75,7 +75,7 @@ define [], () ->
                 name = name.replace(toReplace, '')
 
             result.name = name
-            if @isDir
+            if @type == 'dir' or @type == 'superdir'
                 statPart = result.name[result.name.lastIndexOf('.') + 1 ..]
                 result.path = @path + '.' + statPart
             else
