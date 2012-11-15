@@ -72,11 +72,12 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             ### Parse an expression for stats, return array of stats used
             ###
             statsFound = []
-            findStat = /[a-zA-Z0-9_.-]+/g
+            findStat = /[a-zA-Z_][a-zA-Z0-9_.-]*/g
             while (next = findStat.exec(expr)) != null
                 stat = @_statsController.stats[next[0]]
                 if not stat
-                    continue
+                    new ui.Dialog(body: "Cannot find stat '#{ next[0] }'")
+                    throw "Invalid expression: #{ expr }"
 
                 statsFound.push(stat)
             return statsFound

@@ -73,19 +73,10 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
             @_content.append "<div>Groups Available</div>"
             @groupList = new ui.ListBox(multiple: true)
             @_content.append @groupList
-            addGroupFilter = (grp, filter = '') =>
-                # Add a filter to the UI.  Done through either clicking group
-                # in list, or during load
-                g = $("<div></div>").text(grp).appendTo(@groupsActive)
-              
-                # Stop click from removing the row
-                $("<input class=\"regex\" type=\"text\" />").bind("click", ->
-                    false
-                ).appendTo(g).val(filter)
                 
             @groupList.delegate "option", "click", ->
                 # Don't use fat arrow, this refers to obj clicked
-                addGroupFilter($(this).val())
+                self._addGroupFilter($(this).val())
 
             smootherDiv = $("<div></div>").appendTo(@_content)
             smootherDiv.append "Smooth hours: "
@@ -154,8 +145,9 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
                 
             @expr.trigger("change")
             # And add the groups we're actually using
+            @groupsActive.empty()
             for grp in @_graph.config.groups
-                addGroupFilter(grp[0], grp[1])
+                @_addGroupFilter(grp[0], grp[1])
 
 
         updateExpression: (expr) ->
@@ -172,4 +164,15 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
                             )
                         @groupList.addOption stat.groups[i]
                     i++
+                    
+                    
+        _addGroupFilter: (group, filter = "") ->
+            # Add a filter to the UI.  Done through either clicking group
+            # in list, or during load
+            g = $("<div></div>").text(group).appendTo(@groupsActive)
+          
+            # Stop click from removing the row
+            $("<input class=\"regex\" type=\"text\" />").bind("click", ->
+                false
+            ).appendTo(g).val(filter)
 
