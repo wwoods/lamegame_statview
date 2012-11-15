@@ -19,11 +19,7 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
 
             @_expandCollapse.bind('click', () =>
                 @_content.show()
-                
-                @expr.trigger("change")
-                # And add the groups we're actually using
-                for grp in options.groups
-                    addGroupFilter(grp[0], grp[1])
+                @refresh()
                     
                 ui.Shade.show(@_content, hide: () =>
                     ok.trigger("click")
@@ -49,29 +45,23 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
 
             @_content.append('<br />')
 
-            lb = new ui.ListBox(multiple: true)
-            @_content.append(lb)
-            for name of @_statsController.stats
-                lb.addOption name
-            lb.delegate "option", "click", ->
+            @statsLb = new ui.ListBox(multiple: true)
+            @_content.append(@statsLb)
+            @statsLb.delegate "option", "click", ->
                 # Not fat arrow, need this from event
                 self.expr.val(self.expr.val() + $(this).val())
                 self.expr.trigger('change')
                 self.expr.focus()
 
             exprDiv = $('<div>Expression</div>').appendTo(@_content)
-            @expr = $('<textarea></textarea>').appendTo(exprDiv)
             @_statsFound = []
+            @expr = new ui.TextBox
+                    multiline: true
+                    expand:  true
+                    minWidth: 100
+                    maxWidth: 250
+                .appendTo(exprDiv)
             @expr.bind "change keyup", =>
-                # Re-calculate width of field
-                fake = $('<div style="display:inline-block;white-space:nowrap;"></div>')
-                fake.text(@expr.val())
-                fake.appendTo('body')
-                w = fake.width()
-                fake.remove()
-                @expr.width(Math.min(250, Math.max(100, w)) + 'px')
-                @expr.height(1)
-                @expr.height(Math.max(20, @expr[0].scrollHeight))
                 @updateExpression(@expr.val())
 
             @groupsActive = new ui.Base("<div></div>")
@@ -132,7 +122,7 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
 
             # Bind refresh button
             ok.bind 'click', () =>
-                stat = @_statsController.stats[lb.val()]
+                stat = @_statsController.stats[@statsLb.val()]
                 groups = []
                 @groupsActive.children().each ->
                     filter = $(".regex", $(this)).val()
@@ -153,6 +143,19 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
             @_content.hide()
             if autoExpand
                 @_expandCollapse.trigger("click")
+                
+                
+        refresh: () ->
+            # Called when shown, refresh since stat configuration may
+            # have changed.
+            @statsLb.reset()
+            for name of @_statsController.stats
+                @statsLb.addOption name
+                
+            @expr.trigger("change")
+            # And add the groups we're actually using
+            for grp in @_graph.config.groups
+                addGroupFilter(grp[0], grp[1])
 
 
         updateExpression: (expr) ->

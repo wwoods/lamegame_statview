@@ -1,0 +1,15 @@
+.stat-path-editor {
+	
+}
+
+.stat-path-editor td {
+	padding-right: 1em;
+}
+
+.stat-path-editor .dragger {
+	display: inline-block;
+	cursor: move;
+	width: 1em;
+	height: 1em;
+	background-color: #888;
+}

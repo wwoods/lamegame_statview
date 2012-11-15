@@ -11,23 +11,31 @@ define [ 'cs!statPath', 'cs!stat' ], (StatPath, Stat) ->
             @statPaths = []
 
 
-        addStats: (statPath, statOptions) ->
-            if typeof statPath == 'string'
-                statPath = new StatPath(statPath, statOptions)
-            @statPaths.push(statPath)
-
-
-        parseStats: () ->
-            ### Re-parse our availableStats list, using our paths.
+        parseStats: (paths) ->
+            ### Re-parse our availableStats list, using paths.
             ###
-            @allStats = {}
+            @usedStats = {}
+            @inactiveStats = {}
             @groups = {}
+            @statPaths = []
+            
+            for path in paths
+                @_addPath(path)
+                                    
             for stat in @availableStats
-                @allStats[stat] = true
                 for path in @statPaths
                     result = path.matchStat(stat)
                     if result == null
                         continue
+                        
+                    # It's a match, but is this path inactive?
+                    if path.options.inactive
+                        @inactiveStats[stat] = true
+                        break
+                        
+                    # We are using this stat, so add it to allStats so that
+                    # we can actually load it
+                    @usedStats[stat] = true
 
                     statInit =
                         name: result.name
@@ -55,5 +63,16 @@ define [ 'cs!statPath', 'cs!stat' ], (StatPath, Stat) ->
                             throw "Same stat, different properties"
                     else
                         @stats[result.name] = statDef
+
+
+        _addPath: (pathOptions) ->
+            if typeof pathOptions == 'string'
+                statPath = new StatPath(path: pathOptions)
+            else if not (pathOptions instanceof StatPath)
+                if not pathOptions.path
+                    # An error row
+                    return
+                statPath = new StatPath(pathOptions)
+            @statPaths.push(statPath)
 
 

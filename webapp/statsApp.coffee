@@ -1,5 +1,6 @@
-reqs = [ "cs!lib/ui", "cs!statsController", "cs!dashboard", "css!statsApp" ]
-callback = (ui, StatsController, Dashboard) ->
+reqs = [ "cs!lib/ui", "cs!statsController", "cs!dashboard", "cs!statPathEditor", 
+        "css!statsApp" ]
+callback = (ui, StatsController, Dashboard, StatPathEditor) ->
     class StatsHeader extends ui.Base
         constructor: (app, dashboards) ->
             super('<div class="stats-header"></div>')
@@ -48,6 +49,14 @@ callback = (ui, StatsController, Dashboard) ->
                 .appendTo(@)
                 .bind("click", () =>
                     @app.dashboard.changeColumns(1)
+                )
+                
+            @pathPicker = new ui.Base(
+                    '<input type="submit" value="Add/Edit Stats" 
+                        class="stats-header-path-button" />'
+                ).appendTo(@)
+                .bind("click", () =>
+                    @app.editPaths()
                 )
 
 
@@ -208,10 +217,8 @@ callback = (ui, StatsController, Dashboard) ->
                             $('title').text(data.title)
 
                         @_statsController = new StatsController(data.stats)
-                        for path in data.paths
-                            @_statsController.addStats(path.path, 
-                                    path.options)
-                        @_statsController.parseStats(@stats)
+                        @_paths = data.paths
+                        @_statsController.parseStats(@_paths)
                         console.log(@_statsController)
 
                         @empty()
@@ -231,6 +238,18 @@ callback = (ui, StatsController, Dashboard) ->
             @dashboard = new Dashboard(definition, oldCols).appendTo(@)
             # Avoid initial set of loads
             @dashboard.bind('needs-save', () => @header.needsSave())
+            
+            
+        editPaths: () ->
+            ### Edit the @paths list
+            ###
+            new StatPathEditor
+                app: @
+                controller: @_statsController
+                paths: @_paths
+                onChange: () =>
+                    @_statsController.parseStats(@_paths)
+                    
 
 define(reqs, callback)
 

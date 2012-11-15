@@ -1,7 +1,10 @@
 define [], () ->
     class StatPath
-        constructor: (path, statOptions) ->
-            @statOptions = statOptions
+        constructor: (pathOptions) ->
+            @options = pathOptions
+            # TODO - Stats should get options from specific members of @options
+            @statOptions = undefined
+            path = @options.path
 
             # Find groups in our path
             @groups = []
@@ -11,23 +14,28 @@ define [], () ->
                 @groups.push(next[1])
 
             @path = path
-            isDir = false
+            type = 'stat'
             if /\.\*$/.test(@path)
-                isDir = true
+                type = 'dir'
                 @path = @path[0...-2]
-            @isDir = isDir
-            @pathRegex = @getRegexForPath(@path, @isDir)
+            else if /\.\*\*$/.test(@path)
+                type = 'superdir'
+                @path = @path[0...-3]
+            @type = type
+            @pathRegex = @getRegexForPath(@path, @type)
 
 
-        getRegexForPath: (path, isDir) ->
-            # Return a regex that matches the given path
+        getRegexForPath: (path, type = "stat") ->
+            # Return a regex that matches the given path and type
             findGroup = /{([^}]*)}/g
             reString = (
                     '^' + path.replace(/\./g, '\\.')
                             .replace(findGroup, '([^\\.]*)')
             )
-            if isDir
+            if type == 'dir'
                 reString += '\\.[^\\.]*$'
+            else if type == 'superdir'
+                reString += '\\..*$'
             else
                 reString += '$'
             return new RegExp(reString, 'g')

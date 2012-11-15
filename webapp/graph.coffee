@@ -838,7 +838,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             if groupIndex == groups.length
                 for stat in stats
                     t = stat.getTarget(statData)
-                    if t of @_statsController.allStats
+                    if t of @_statsController.usedStats
                         outputs[t] = true
                 return
 
