@@ -89,9 +89,9 @@ define ["cs!lib/ui", "css!statPathEditor"], (ui) ->
                     @pathTable.append(new PathRow(newDef))
                 )
                 .appendTo(@pathBlock)
-            @pathBlockSave = new ui.Base(
-                    '<input type="submit" value="Save" />')
-                .bind("click", () => @save())
+            @pathBlockUndo = new ui.Base(
+                    '<input type="submit" value="Undo since save" />')
+                .bind("click", () => @undoSinceSave())
                 .appendTo(@pathBlock)
             @helpBtn = new ui.Base('<input type="submit" value="Help" />')
                 .bind("click", () => @help())
@@ -151,16 +151,14 @@ define ["cs!lib/ui", "css!statPathEditor"], (ui) ->
         remove: () ->
             ### Restore the last saved paths, and return
             ###
-            while @options.paths.length > 0
-                @options.paths.pop()
-            for cp in @_copiedPaths
-                @options.paths.push(cp)
-            if @options.onChange
-                @options.onChange()
-            super()
+            # Default to save
+            @save () =>
+                if @options.onChange
+                    @options.onChange()
+                super()
             
             
-        save: (pathDef) ->
+        save: (onOkCallback) ->
             dlg = new ui.Dialog(body: "Saving...")
             
             # Reconstruct @options.paths from dom
@@ -178,11 +176,11 @@ define ["cs!lib/ui", "css!statPathEditor"], (ui) ->
             
             onOk = () =>
                 dlg.remove()
-                if @options.onChange
-                    @options.onChange()
                 @_updateLastSaved()
                 @_updateAvailable()
                 @refresh()
+                if onOkCallback
+                    onOkCallback()
                 
             onError = (e) =>
                 dlg.remove()
@@ -216,6 +214,15 @@ define ["cs!lib/ui", "css!statPathEditor"], (ui) ->
                         doNext()
             # Start the chain
             doNext()
+            
+            
+        undoSinceSave: () ->
+            while @options.paths.length > 0
+                @options.paths.pop()
+            for cp in @_copiedPaths
+                # Re-copy so that we still have our golden last-saved set
+                @options.paths.push($.extend(true, {}, cp))
+            @refresh()
                         
                         
         _newPathId: () ->
