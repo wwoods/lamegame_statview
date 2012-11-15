@@ -1,6 +1,7 @@
 reqs = [ "cs!lib/ui", "cs!statsController", "cs!dashboard", "cs!statPathEditor", 
-        "js-hash/Hash", "css!statsApp" ]
-callback = (ui, StatsController, Dashboard, StatPathEditor, Hash) ->
+        "cs!filterEditor", "js-hash/Hash", "css!statsApp" ]
+callback = (ui, StatsController, Dashboard, StatPathEditor, FilterEditor, 
+        Hash) ->
     class StatsHeader extends ui.Base
         constructor: (app, dashboards) ->
             super('<div class="stats-header"></div>')
@@ -35,6 +36,30 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, Hash) ->
                 if e.which == 13 # enter
                     @refresh.trigger("click")
             @append(" (hours/days/weeks/years)")
+            
+            @append('&nbsp;&nbsp;&nbsp;&nbsp;')
+            @globalFilters = {}
+            @globalFilters_doc = "Dict of filters: { group: [ values ] }"
+            @filters = new ui.Base('<input type="submit" value="Filters" />')
+                .appendTo(@)
+                .bind("click", () =>
+                    new FilterEditor(
+                        filters: @globalFilters
+                        statsController: @app._statsController
+                        onChange: () => @refresh.trigger("click")
+                    )
+                )
+                .bind("mouseover", (e) =>
+                    html = "Filtering on:"
+                    for g, vals of @globalFilters
+                        if vals.length == 1
+                            desc = g + ' = ' + vals[0]
+                        else
+                            desc = "#{ vals.length } #{ g }s"
+                        html += "<br />&nbsp;&nbsp;&nbsp;&nbsp;#{ desc }"
+                    ui.Tooltip.show(e, html)
+                )
+                .bind("mouseout", () => ui.Tooltip.hide())
 
             @append('&nbsp;&nbsp;&nbsp;&nbsp;Columns: ')
             @columnSub = new ui.Base(
@@ -133,6 +158,8 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, Hash) ->
             viewDef =
                 view: @picker.val()
                 timeAmt: @timeAmt.val()
+            if not $.compareObjs({}, @globalFilters)
+                viewDef.filters = @globalFilters
             Hash.update(JSON.stringify(viewDef))
                 
                 
@@ -301,6 +328,10 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, Hash) ->
                 if obj.view?
                     if obj.timeAmt?
                         @header.timeAmt.val(obj.timeAmt)
+                    if obj.filters?
+                        @header.globalFilters = obj.filters
+                    else
+                        @header.globalFilters = {}
                     @header.picker.select(obj.view)
                 else
                     throw "Unknown hash: " + hash

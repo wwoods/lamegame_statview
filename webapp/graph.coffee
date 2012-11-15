@@ -130,9 +130,26 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
 
             stats = self.parseStats(self.config.expr, true)
 
+            # Get all groups from all stats
+            allGroups = {}
+            for stat in stats
+                for group in stat.groups
+                    allGroups[group] = true
+
             # Copy the groups array
             groups = self.config.groups[..]
-            groupFiltersBase = self._statsController.groups
+            availableFiltersBase = self._statsController.groups
+            
+            # Ensure we respect the global filters; fill out 
+            globalFilters = ui.fromDom(@closest('.dashboard'))
+                .getAllowedGroupValues()
+            groupFiltersBase = {}
+            for group of allGroups
+                if group of globalFilters
+                    groupFiltersBase[group] = globalFilters[group]
+                else
+                    # Everything's fair game
+                    groupFiltersBase[group] = availableFiltersBase[group]
 
             groupFilters = {}
             for group in groups
@@ -147,14 +164,10 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                 else
                     groupFilters[group[0]] = baseValues
 
-            # Get all groups from all stats
-            allGroups = {}
-            for stat in stats
-                for group in stat.groups
-                    allGroups[group] = true
-
-            # We don't support * syntax outbound; fill in all possible values
-            # that aren't already specified
+            # We don't support * syntax outbound since we're not ONLY getting
+            # stats from graphite; fill in all possible values that aren't 
+            # already specified.  Plus, for global filters, it's kind of good
+            # that we are specifying everything.
             for group of allGroups
                 if not (group of groupFilters)
                     groups.push([ group ])

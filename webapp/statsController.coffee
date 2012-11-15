@@ -7,7 +7,7 @@ define [ 'cs!statPath', 'cs!stat' ], (StatPath, Stat) ->
             @stats = {}
             @stats_doc = """{ name: { path: path w/ groups, groups: [ group names ] } }"""
             @groups = {}
-            @groups_doc = """{ name: [ possible values ] }"""
+            @groups_doc = """{ name: [ sorted possible values ] }"""
             @statPaths = []
 
 
@@ -64,6 +64,9 @@ define [ 'cs!statPath', 'cs!stat' ], (StatPath, Stat) ->
                             throw "Same stat, different properties"
                     else
                         @stats[result.name] = statDef
+                        
+            for g of @groups
+                @groups[g].sort()
 
 
         _addPath: (pathOptions) ->

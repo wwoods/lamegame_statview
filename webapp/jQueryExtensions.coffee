@@ -1,6 +1,9 @@
 define ["jquery"], () ->
     $.compareObjs = (a,b) ->
         # Returns true if objects match, false otherwise
+        if a == null or b == null
+            # typeof null == 'object' for some reason...
+            return (a == b)
         if typeof a == typeof b and typeof a == "object"
             for own key of a
                 if not b.hasOwnProperty(key)

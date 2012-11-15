@@ -121,6 +121,12 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             if @container.columns < 1
                 @container.columns = 1
             @container.resize()
+            
+            
+        getAllowedGroupValues: () ->
+            # Get the global filter; returns a dict of { groupName: [ values ] }
+            # for groups that have filters.
+            return ui.fromDom('.stats-header').globalFilters
 
 
         getDefinition: () ->
