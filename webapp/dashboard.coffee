@@ -107,7 +107,6 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
                 if @closest('body').length == 0
                     # No longer in dom
                     $(window).unbind("resize", mySizer)
-                    clearInterval(sizePoll)
                     
                 nwidth = $(window).width()
                 if nwidth != owidth
