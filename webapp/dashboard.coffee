@@ -102,12 +102,21 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
 
             @container = new DashboardContainer(definition, columns).appendTo(@)
             
-            mySizer = () => 
+            owidth = $(window).width()
+            mySizer = () =>
                 if @closest('body').length == 0
                     # No longer in dom
                     $(window).unbind("resize", mySizer)
-                @container.resize()
+                    clearInterval(sizePoll)
+                    
+                nwidth = $(window).width()
+                if nwidth != owidth
+                    owidth = nwidth
+                    @container.resize()
             $(window).resize(mySizer)
+            # OK, when we add a scroll bar to the right-hand side of the 
+            # document without any other changes, resize() isn't triggered...
+            sizePoll = setInterval(mySizer, 100)
 
 
         changeColumns: (i) ->

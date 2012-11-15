@@ -240,6 +240,10 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, Hash) ->
                         @empty()
                         @header = new StatsHeader(@, data.dashboards)
                                 .appendTo(@)
+
+                        $(window).resize(() => @onResize())
+                        @onResize()
+                                
                         Hash.init((hash, isFirst) => 
                             @_onHashChange(hash, isFirst)
                         )
@@ -267,6 +271,15 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, Hash) ->
                 paths: @_paths
                 onChange: () =>
                     @_statsController.parseStats(@_paths)
+                    
+                    
+        onResize: () ->
+            ### When the window resizes, the height of the stats-header may
+            have changed, meaning we need to adjust our padding-top so that
+            all of the graphs are visible.
+            ###
+            @css
+                paddingTop: @header.outerHeight(true)
                     
                     
         _onHashChange: (hash, isFirst) ->

@@ -43,7 +43,7 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
             @type = new ui.ListBox()
             @type.addOption "area-zoom", "Area Zoom"
             @type.addOption "linear-zoom", "Linear Zoom"
-            @type.addOption "area", "Area"
+            # Not currently supported; @type.addOption "area", "Area"
             @_content.append(@type)
 
             @_content.append('<br />')
