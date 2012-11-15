@@ -49,9 +49,13 @@ define [], () ->
                 lastParenEnd = reString.indexOf(')', nextParen + 2)
                 if lastParenEnd < 0
                     throw "Bad regex: " + reString
-            # From lastParenEnd to end is final capture group
+            # From lastParenEnd to end is final specified capture group
             reString = reString[...lastParenEnd + 1] + '(' + 
-                    reString[lastParenEnd + 1..]
+                    reString[lastParenEnd + 1..] + ')'
+                    
+            # Any non-specific stuff should go in a separate capture group
+            reString += '('
+                    
             if type == 'dir'
                 reString += '\\.[^\\.]*'
             else if type == 'superdir'
@@ -90,6 +94,16 @@ define [], () ->
                 if i % 2 == 0
                     continue
                 statName += match[i]
+                
+            # We score matches according to longest specified match.. since 
+            # last segment is wildcards, so this before adding the last match.
+            # Note that this includes double (or even triple) dots.  Should
+            # not affect, but good for debugging info.
+            result.score = statName.length
+            
+            # The last element is never even, but is still specific in that it
+            # only includes trailing wildcards
+            statName += match[match.length - 1]
             
             # Make it pretty - take out double or more dots, since they're 
             # leftovers from filtered groups
@@ -102,6 +116,10 @@ define [], () ->
             else
                 result.path = @path
             result.pathRegex = @getRegexForPath(result.path)
+            
+            if @options.inactive
+                result.inactive = true
+            
             return result
 
 
