@@ -736,8 +736,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                 for ds in subgroupSets
                     # If this layer is imperceptible, set ynorm to 0
                     av = Math.abs(ds[i].y)
-                    if ds[i].y == 0 or
-                            absCombined[i] < absCombinedMax / (2*height)
+                    portion = Math.abs(ds[i].y) / abs
+                    if ds[i].y == 0 or absCombined[i] < 1e-6
                         ds[i].ynorm = 0
                     else
                         ds[i].ynorm = Math.abs(ds[i].y) / absCombined[i]
