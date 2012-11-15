@@ -649,13 +649,20 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             if @_sanitize
                 # Use 2 standard deviations for cap
                 sum = 0.0
-                count = combined.length
-                for val in combined
-                    sum += Math.abs(val.y)
+                count = 0
+                for pt in combined
+                    v = Math.abs(pt.y)
+                    if v > 0
+                        # Don't count points that don't have scale; we're more
+                        # interested in the deviation of valued points
+                        sum += v
+                        count += 1
                 avg = sum / count
                 stddev = 0.0
-                for val in combined
-                    stddev += Math.pow(Math.abs(val.y) - avg, 2)
+                for pt in combined
+                    v = Math.abs(pt.y)
+                    if v > 0
+                        stddev += Math.pow(v - avg, 2)
                 stddev = Math.sqrt(stddev / count)
                 topStddev = avg + stddev * 2
                 if topStddev < realMax
@@ -895,13 +902,19 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                 count = 0
                 for i in [0...subgroupSets[0].length]
                     for ds in subgroupSets
-                        sum += Math.abs(ds[i].y)
-                        count += 1
+                        v = Math.abs(ds[i].y)
+                        if v > 0
+                            # Don't count points that don't have scale; we're 
+                            # more interested in the deviation of valued points
+                            sum += v
+                            count += 1
                 avg = sum / count
                 stddev = 0.0
                 for i in [0...subgroupSets[0].length]
                     for ds in subgroupSets
-                        stddev += Math.pow(Math.abs(ds[i].y) - avg, 2)
+                        v = Math.abs(ds[i].y)
+                        if v > 0
+                            stddev += Math.pow(v - avg, 2)
                 stddev = Math.sqrt(stddev / count)
                 topStddev = avg + stddev * 2
                 if topStddev < ymax
