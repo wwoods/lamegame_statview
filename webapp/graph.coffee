@@ -749,6 +749,10 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                     .on("mousemove", (d) =>
                         text = combined.title + ': '
                         text += @_formatValue(@_eventInterp(d))
+                        
+                        # Compile a list of subgroups that affect this value,
+                        # and sort their tooltips and append
+                        subtips = []
                         for key, ds of layerData.subgroups
                             r = @_eventInterp(ds.getGraphPoints())
                             if Math.abs(r) < (ymax - ymin) / height / 2 and
@@ -756,7 +760,12 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                                 # Insignificant value
                                 continue
                             valStr = @_formatValue(r)
-                            text += '<br/>' + ds.title + ': ' + valStr
+                            tipLine = '<br/>' + ds.title + ': ' + valStr
+                            subtips.push([ tipLine, r ])
+                            
+                        subtips.sort (a,b) -> Math.abs(b[1]) - Math.abs(a[1])
+                        for tip in subtips
+                            text += tip[0]
                         ui.Tooltip.show(d3.event, text)
                     )
                     .on("mouseout", () => ui.Tooltip.hide())
