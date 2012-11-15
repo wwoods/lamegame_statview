@@ -76,6 +76,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             while (next = findStat.exec(expr)) != null
                 stat = @_statsController.stats[next[0]]
                 if not stat
+                    if /Math\./.test(next[0])
+                        # Math expression, OK to skip
+                        continue
                     new ui.Dialog(body: "Cannot find stat '#{ next[0] }'")
                     throw "Invalid expression: #{ expr }"
 
