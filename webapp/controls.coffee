@@ -95,7 +95,7 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
             cloner.bind "click", () =>
                 Graph = require("cs!graph")
                 @uiClosest('.dashboard-container').append(
-                        new Graph(@_graph.config), @)
+                        new Graph(@_graph.config, @_graph.dashboard), @)
                 ui.Shade.hide()
             deleter = new ui.Base('<input type="button" value="Delete" />')
             deleter.css

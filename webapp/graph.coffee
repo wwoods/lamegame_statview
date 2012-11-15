@@ -9,7 +9,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
     graphColors = d3.scale.category20()
     
     class Graph extends ui.Base
-        constructor: (config) ->
+        constructor: (config, dashboard) ->
             super('<div class="graph"></div>')
             self = this
             self._statsController = ui.Base.fromDom('.stats-app')._statsController
@@ -17,6 +17,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             self._display = $('<div class="graph-display"></div>').appendTo(
                     self)
 
+            @dashboard = dashboard
             self.config =
                 title: '(unnamed)'
                 type: 'area-zoom'
@@ -141,8 +142,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             availableFiltersBase = self._statsController.groups
             
             # Ensure we respect the global filters; fill out 
-            globalFilters = ui.fromDom(@closest('.dashboard'))
-                .getAllowedGroupValues()
+            globalFilters = @dashboard.getAllowedGroupValues()
             groupFiltersBase = {}
             for group of allGroups
                 if group of globalFilters
@@ -183,18 +183,18 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
 
             timeTo = self.config.timeBasis
             if timeTo == ''
-                timeTo = ui.fromDom(@closest('.dashboard')).getTimeBasis()
+                timeTo = @dashboard.getTimeBasis()
             if timeTo == 'now'
                 timeTo = (new Date().getTime() / 1000)
 
             timeAmt = self.config.timeAmt
             if timeAmt == ''
-                timeAmt = ui.fromDom(@closest('.dashboard')).getTimeAmt()
+                timeAmt = @dashboard.getTimeAmt()
             timeFrom = timeTo - self.parseInterval(timeAmt)
             
             # Update _sanitize
             @_sanitize = false
-            if @uiClosest('.dashboard').getSanitize()
+            if @dashboard.getSanitize()
                 @_sanitize = true
 
             $.ajax('getData', {
@@ -1253,10 +1253,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             _title.bind 'click', () =>
                 cfg = $.extend({}, @config)
                 # Grab our time basis
-                dash = ui.fromDom(@closest('.dashboard'))
-                cfg.timeBasis = dash.getTimeBasis()
-                cfg.timeAmt = dash.getTimeAmt()
-                g = new Graph(cfg)
+                cfg.timeBasis = @dashboard.getTimeBasis()
+                cfg.timeAmt = @dashboard.getTimeAmt()
+                g = new Graph(cfg, @dashboard)
                 page = $('<div class="graph-fullscreen"></div>')
                 page.append(g).appendTo('body')
                 page.bind 'click', (e) =>

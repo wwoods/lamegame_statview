@@ -33,15 +33,16 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             # Let us get added to dom, since we'll need a valid width
             ui.setZeroTimeout () =>
                 @app = ui.fromDom(@closest('.stats-app'))
+                @dashboard = @uiClosest('.dashboard')
 
                 @_createNew = new DashboardNew()
                 @_createNew.bind "click", () =>
-                    @append(new Graph())
+                    @append(new Graph({}, @dashboard))
                 @_createNew = @append(@_createNew)
 
                 if definition?
                     for config in definition.graphs
-                        @append(new Graph(config))
+                        @append(new Graph(config, @dashboard))
 
 
         append: (graph, insertAfter) ->
