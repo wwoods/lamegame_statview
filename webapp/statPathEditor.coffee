@@ -21,6 +21,13 @@ define ["cs!lib/ui", "css!statPathEditor"], (ui) ->
             @path.val(pathDef.path)
             @path.bind("keyup change", () => @update())
             
+            @type = new ui.ListBox().appendTo(@)
+            @type.addOption("count", "Counter")
+            @type.addOption("total", "Sample")
+            if pathDef.type?
+                @type.val(pathDef.type)
+            @type.bind("keyup change", () => @update())
+            
             @isDirty = false
             @isDeleted = false
             
@@ -30,6 +37,11 @@ define ["cs!lib/ui", "css!statPathEditor"], (ui) ->
             newPath = @path.val()
             if @pathDef.path != newPath
                 @pathDef.path = newPath
+                @isDirty = true
+                
+            newType = @type.val()
+            if @pathDef.type != newType
+                @pathDef.type = newType
                 @isDirty = true
                 
             newDelete = (not @keeper.is(':checked'))
@@ -53,7 +65,8 @@ define ["cs!lib/ui", "css!statPathEditor"], (ui) ->
             @options = options
             
             body = new ui.Base('<div class="stat-path-editor"></div>')
-            @pathBlock = new ui.Base('<div class="paths"></div>').appendTo(body)
+            @pathBlock = new ui.Base('<div class="paths"></div>')
+                .appendTo(body)
             @pathTable = new ui.DragContainer
                     root: $('<table></table>')
                     childSelector: 'tr'
@@ -80,13 +93,36 @@ define ["cs!lib/ui", "css!statPathEditor"], (ui) ->
                     '<input type="submit" value="Save" />')
                 .bind("click", () => @save())
                 .appendTo(@pathBlock)
-                
+            @helpBtn = new ui.Base('<input type="submit" value="Help" />')
+                .bind("click", () => @help())
+                .appendTo(@pathBlock)
+            
+            body.append('<div>Unused Paths</div>')
             @availBlock = new ui.ListBox(multiple: true).appendTo(body)
             @_updateAvailable()
             
             super(
                 body: body
             )
+            
+            
+        help: () ->
+            body = $('<div></div>')
+            body.append('<p>Paths are dot-delimited segments of statistics,
+                and should use curly braces with a name in the middle to 
+                denote groups within those stats.  They may end in or contain
+                either a single asterisk to match within a dot-delimiter, or
+                a double asterisk to match anything.</p>')
+            body.append("<p>Note that curly braces must be used between
+                two dots, and nowhere else; e.g. hey.{var}.there is valid,
+                but hey.j{var}.there is not.</p>")
+            body.append('<p>Examples:</p>')
+            ul = $('<ul></ul>').appendTo(body)
+            ul.append('<li>hosts.{host}.* - matches hosts.a.b but not 
+                hosts.a.b.c</li>')
+            ul.append('<li>hosts.{host}.** - matches hosts.a.b and
+                hosts.a.b.c</li>')
+            new ui.Dialog(body: body).css(maxWidth: '10cm')
             
             
         refresh: () ->
@@ -98,6 +134,7 @@ define ["cs!lib/ui", "css!statPathEditor"], (ui) ->
                     <td>Keep</td>
                     <td>Inactive</td>
                     <td>Path</td>
+                    <td>Type</td>
                 </tr>')
             # Sort paths by activity and path
             @options.paths.sort (a,b) ->

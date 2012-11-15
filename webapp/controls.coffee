@@ -32,16 +32,19 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
             # COMMENTED!  Dashboard has an overall time, no need for this
             #@_content.append(timeDiv)
 
-            @type = new ui.ListBox()
-            @type.addOption "area-zoom", "Area Zoomed"
-            @type.addOption "area", "Area"
-            @_content.append(@type)
-
             @_content.append("Title: ")
             @title = $('<input type="text" />').appendTo(@_content)
             @title.css
                 width: '200px'
             @title.val('(unnamed)')
+
+            @_content.append('<br />')
+
+            @type = new ui.ListBox()
+            @type.addOption "area-zoom", "Area Zoom"
+            @type.addOption "linear-zoom", "Linear Zoom"
+            @type.addOption "area", "Area"
+            @_content.append(@type)
 
             @_content.append('<br />')
 
@@ -104,6 +107,7 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
 
             # Populate initial fields from graph
             options = @_graph.config
+            @type.select(options.type)
             @title.val(options.title)
             @expr.val(options.expr)
             smoother.val(options.smoothOver)

@@ -1,6 +1,6 @@
 reqs = [ "cs!lib/ui", "cs!statsController", "cs!dashboard", "cs!statPathEditor", 
-        "css!statsApp" ]
-callback = (ui, StatsController, Dashboard, StatPathEditor) ->
+        "js-hash/Hash", "css!statsApp" ]
+callback = (ui, StatsController, Dashboard, StatPathEditor, Hash) ->
     class StatsHeader extends ui.Base
         constructor: (app, dashboards) ->
             super('<div class="stats-header"></div>')
@@ -23,7 +23,10 @@ callback = (ui, StatsController, Dashboard, StatPathEditor) ->
             @deleter.bind("click", () => @deleteDash())
 
             @refresh = $('<input type="submit" value="Refresh" />').appendTo(@)
-            @refresh.bind("click", () => @app.dashboard.refresh())
+            @refresh.bind("click", () => 
+                    @_hashUpdate()
+                    @app.dashboard.refresh()
+            )
 
             @append("show me ")
             @timeAmt = $('<input type="text" />').appendTo(@)
@@ -71,6 +74,10 @@ callback = (ui, StatsController, Dashboard, StatPathEditor) ->
             # Since we're changing to a defined dashboard, that means we no
             # longer need (unsaved)
             @picker.remove('(unsaved)')
+            
+            # At this point, we're definitely navigating to a dashboard,
+            # so set the hash
+            @_hashUpdate()
 
             if newVal == '(new)'
                 # Should show some confirmation, but...
@@ -118,6 +125,15 @@ callback = (ui, StatsController, Dashboard, StatPathEditor) ->
                         return onError(result)
                     @picker.remove(dashId, '(new)')
                 error: onError
+                
+                
+        _hashUpdate: () ->
+            ### Update the hash with a definition of our view.
+            ###
+            viewDef =
+                view: @picker.val()
+                timeAmt: @timeAmt.val()
+            Hash.update(JSON.stringify(viewDef))
                 
                 
         needsSave: () ->
@@ -222,10 +238,12 @@ callback = (ui, StatsController, Dashboard, StatPathEditor) ->
                         console.log(@_statsController)
 
                         @empty()
-                        @header = new StatsHeader(@, data.dashboards).appendTo(
-                                @)
-                        @header.picker.trigger("change")
-                        # @dashboard is made by the header
+                        @header = new StatsHeader(@, data.dashboards)
+                                .appendTo(@)
+                        Hash.init((hash, isFirst) => 
+                            @_onHashChange(hash, isFirst)
+                        )
+                        # @dashboard is made in the hash selection
                 }
             )
 
@@ -249,6 +267,30 @@ callback = (ui, StatsController, Dashboard, StatPathEditor) ->
                 paths: @_paths
                 onChange: () =>
                     @_statsController.parseStats(@_paths)
+                    
+                    
+        _onHashChange: (hash, isFirst) ->
+            ### Called whenever our address bar hash changes; most of those
+            are going to be generated from within our application.  However,
+            the caveat is that they should be generated based on a desired
+            destination for the user.
+            ###
+            try
+                obj = $.parseJSON(hash)
+            catch e
+                # Default to no hash, which parseJSON maps to null
+                obj = null
+            if not obj?
+                if isFirst 
+                    # Initialize hash by changing picker
+                    @header.picker.trigger('change')
+            else
+                if obj.view?
+                    if obj.timeAmt?
+                        @header.timeAmt.val(obj.timeAmt)
+                    @header.picker.select(obj.view)
+                else
+                    throw "Unknown hash: " + hash
                     
 
 define(reqs, callback)

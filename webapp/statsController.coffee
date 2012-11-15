@@ -14,6 +14,7 @@ define [ 'cs!statPath', 'cs!stat' ], (StatPath, Stat) ->
         parseStats: (paths) ->
             ### Re-parse our availableStats list, using paths.
             ###
+            @stats = {}
             @usedStats = {}
             @inactiveStats = {}
             @groups = {}

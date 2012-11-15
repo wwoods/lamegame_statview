@@ -1,6 +1,13 @@
 reqs = [ 'cs!lib/ui', 'cs!stat', 'cs!controls', 'cs!dataset', 'cs!datagroup',
         'css!graph' ]
 module = (ui, Stat, Controls, DataSet, DataGroup) ->
+    # d3.scale.category20 does something cool - it returns a method that gives
+    # you a color from a rotating list of 20.  What's cool is that it keeps
+    # a map of values it has seen before - that is, if we keep a global
+    # category20 instance on Graph, then any graphed value will always have
+    # the exact same color in all of our graphs.  Yay!
+    graphColors = d3.scale.category20()
+    
     class Graph extends ui.Base
         constructor: (config) ->
             super('<div class="graph"></div>')
@@ -131,10 +138,10 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             for group in groups
                 baseValues = groupFiltersBase[group[0]]
                 if group[1] != ''
-                    regex = new RegExp(group[1])
+                    regex = new RegExp('^' + group[1] + '$')
                     groupValues = []
                     groupFilters[group[0]] = groupValues
-                    for j of baseValues
+                    for j in baseValues
                         if regex.test(j)
                             groupValues.push(j)
                 else
@@ -158,6 +165,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             targets = []
             for t of targetSet
                 targets.push(t)
+            if targets.length == 0
+                console.log("Failed to get any targets")
 
             timeTo = self.config.timeBasis
             if timeTo == ''
@@ -535,12 +544,11 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             # First render
             vis = d3.select(display[0]).append('svg')
             vis.attr('width', width).attr('height', height)
-            color = Graph.colors
             self = @
             vis.selectAll("path")
                 .data(stacks).enter()
                     .append("path")
-                    .style("fill", (d) -> color(d.title))
+                    .style("fill", (d) -> graphColors(d.title))
                     .attr("d", getAreaMethod())
                     .on("mousemove", (d) =>
                         val = @_eventInterp(d)
@@ -550,22 +558,31 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                     .on("mouseout", () -> ui.Tooltip.hide())
 
 
-        _drawGraph_areaZoom: (data, display, height) ->
+        _drawGraph_zoom: (data, display, height, zoomType) ->
             ### Draw an area_zoom graph of data in display with height.
             
             data -- DataGroup representing the base values
             ###
             layers = [ [ data, null ] ]
-            @__areaZoomContainer = $([])
-            @_drawGraph_areaZoom_layer(layers, display, height)
+            @__zoomContainer = $([])
+            options =
+                layers: layers
+                display :display
+                height: height
+                zoomType: zoomType
+            @_drawGraph_zoom_layer(options)
             
             
-        _drawGraph_areaZoom_layer: (layers, display, height) ->
+        _drawGraph_zoom_layer: (options) ->
             ### Draw the next layer of an area_zoom.  Essentially, for now, 
             wipe display and re-draw the top layer
             ###
-            @__areaZoomContainer.remove()
-            @__areaZoomContainer = $('<div></div>').appendTo(display)
+            
+            # De-compress options
+            {layers, display, height, zoomType} = options
+            
+            @__zoomContainer.remove()
+            @__zoomContainer = $('<div></div>').appendTo(display)
             
             width = display.width()
             [layerData, detailStackOrder] = layers[layers.length - 1]
@@ -590,118 +607,22 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                 subgroupSets = []
                 for key, subgroup of layerData.subgroups
                     subgroupSets.push(subgroup.getGraphPoints())
-
-                # 100% expand render - remap points to [0..1] based on portion 
-                # of _the absolute value_ of combind subgroups
-                absCombined = []
-                absCombinedMax = 0.0
-                for i in [0...subgroupSets[0].length]
-                    # Calculate the total "effect" here...
-                    absVal = 0
-                    for ds in subgroupSets
-                        absVal += Math.abs(ds[i].y)
-                    absCombined[i] = absVal
-                    absCombinedMax = Math.max(absCombinedMax, absVal)
-                    
-                for i in [0...subgroupSets[0].length]
-                    # And now calculate the normalized "ynorm" component for
-                    # each subgroup
-                    for ds in subgroupSets
-                        # If this layer is imperceptible, set ynorm to 0
-                        av = Math.abs(ds[i].y)
-                        if ds[i].y == 0 or
-                                absCombined[i] < absCombinedMax / (2*height)
-                            ds[i].ynorm = 0
-                        else
-                            ds[i].ynorm = Math.abs(ds[i].y) / absCombined[i]
-    
-                # d3.layout.stack() adds the "y0" property to dataSets, and 
-                # stacks them
-                stacksGen = d3.layout.stack().offset('zero')
-                    .y((d) -> d.ynorm)
-                    .out (d, y0, y) ->
-                        d.y0 = y0
                 
-                # We offer click-to-level functionality, since it can be hard
-                # to tell the trend of any individual element if it doesn't 
-                # have an edge that's a horizontal line
-                if detailStackOrder?
-                    stackOrder = detailStackOrder
+                # Figure out what type of subgroup rendering we're doing...
+                detailHeight = height - trendHeight
+                detailVis = d3.select(@__zoomContainer[0]).append('svg')
+                    .attr('width', width)
+                    # Take 1 px off height for border
+                    .attr('height', detailHeight - 1)
+                $(detailVis[0]).css('border-top', 'solid 1px #444')
+                if zoomType == 'area'
+                    @_drawGraph_zoom_layer_area(options, detailVis, 
+                            subgroupSets)
+                else if zoomType == 'linear'
+                    @_drawGraph_zoom_layer_linear(options, detailVis,
+                            subgroupSets)
                 else
-                    stackOrder = [0...subgroupSets.length]
-                    
-                restackData = () =>
-                    # Run the d3.layout.stack on a sorted version of our
-                    # subgroupSets; it's nice to keep the order that
-                    # we pass them to the visualization the same so 
-                    # that the same colors represent the same objects
-                    toStack = []
-                    for i in stackOrder
-                        toStack.push(subgroupSets[i])
-                    return stacksGen(toStack)
-                    
-                # Perform first stack
-                restackData()
-    
-                # Draw the proportional bit
-                vis = d3.select(@__areaZoomContainer[0]).append('svg')
-                visHeight = height - trendHeight
-                vis.attr('width', width).attr('height', visHeight)
-                
-                self = @
-                color = Graph.colors
-                area = d3.svg.area()
-                area
-                    .x((d) -> (d.x - xmin) * width / (xmax - xmin))
-                    .y0((d) -> visHeight - d.y0 * visHeight)
-                    .y1((d) -> visHeight - (d.ynorm + d.y0) * visHeight)
-                vis.selectAll("path")
-                    .data(subgroupSets).enter()
-                        .append("path")
-                        .style("fill", (d) -> color(d.title))
-                        .attr("d", area)
-                        .on("mousemove", (d) =>
-                            val = @_eventInterp(d)
-                            valStr = @_formatValue(val)
-                            ui.Tooltip.show(d3.event, d.title + ': ' + valStr)
-                        )
-                        .on("mouseout", () => ui.Tooltip.hide())
-                        .on("click", (d, di) =>
-                            console.log(arguments)
-                            console.log(stackOrder)
-                            
-                            if di == stackOrder[0]
-                                # Already at the bottom, zoom in
-                                # Write out our current stackOrder to our
-                                # layer so that when it's restored, it will be
-                                # sorted like it was before
-                                layers[layers.length - 1][1] = stackOrder
-                                
-                                # Push a new layer and re-render
-                                layers.push([ d.group, null ])
-                                @_drawGraph_areaZoom_layer(layers, display,
-                                        height)
-                                return
-    
-                            # Remove current stackOrder == di and put it at 0
-                            # Swap current 0 with stackOrder == di
-                            diPos = -1
-                            for q, j in stackOrder
-                                if q == di
-                                    diPos = j
-                                    break
-    
-                            stackOrder = stackOrder[...diPos].concat(
-                                stackOrder[diPos + 1..])
-                            stackOrder.unshift(di)
-                            
-                            restackData()
-                            vis.selectAll("path")
-                                .data(subgroupSets)
-                                .transition()
-                                    .duration(1000)
-                                    .attr("d", area)
-                        )
+                    throw "Invalid render zoom type - " + zoomType
 
             # Draw the overall trend graph
             # Split combined into combinedp and combinedn - positive and 
@@ -718,24 +639,25 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                 else
                     combinedn.push(val)
                     combinedp.push(fake)
-            visn = d3.select(@__areaZoomContainer[0]).append('svg')
+            visn = d3.select(@__zoomContainer[0]).append('svg')
+            $('<div class="graph-display-label-max"></div>')
+                .text(@_formatValue(realMax))
+                .insertBefore(visn[0])
             visn.attr('width', width).attr('height', trendHeight - 1)
             $(visn[0]).css('border-top', 'solid 1px #444')
-            color = Graph.colors
+            
+            # Fix divide by zero (after filling out graph-label-max)
+            if realMax == 0
+                realMax = 1
+            
             visn.selectAll("path")
                 .data([ combinedp, combinedn ]).enter()
                     .append("path")
-                    .style("fill", (d) => 
-                            c = color(combined.title)
+                    .style("fill", (d) =>
                             if d == combinedn
-                                # Slightly lighter
-                                r = parseInt(c[1..2], 16)
-                                g = parseInt(c[3..4], 16)
-                                b = parseInt(c[5..6], 16)
-                                r += (255 - r) * 0.3
-                                g += (255 - g) * 0.3
-                                b += (255 - b) * 0.3
-                                c = @_getColorHex(r, g, b)
+                                c = @_getNegativeColor(combined.title)
+                            else
+                                c = graphColors(combined.title)
                             return c
                         )
                     .attr(
@@ -772,8 +694,232 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                     .on("click", () =>
                         if layers.length > 1
                             layers.pop()
-                            @_drawGraph_areaZoom_layer(layers, display, height)
+                            @_drawGraph_zoom_layer(options)
                     )
+                    
+                    
+        _drawGraph_zoom_layer_area: (options, detailVis, subgroupSets) ->
+            # 100% expand render - remap points to [0..1] based on portion 
+            # of _the absolute value_ of combind subgroups
+            
+            # De-compress options
+            {layers, display, height, zoomType} = options
+            width = $(detailVis[0]).width()
+            height = $(detailVis[0]).height()
+            xmin = subgroupSets[0][0].x
+            xmax = subgroupSets[0][subgroupSets[0].length - 1].x
+            
+            absCombined = []
+            absCombinedMax = 0.0
+            for i in [0...subgroupSets[0].length]
+                # Calculate the total "effect" here...
+                absVal = 0
+                for ds in subgroupSets
+                    absVal += Math.abs(ds[i].y)
+                absCombined[i] = absVal
+                absCombinedMax = Math.max(absCombinedMax, absVal)
+                
+            # No label for y-max on area slices... the fact that it's fully
+            # colored makes it hard to see, and it's the same max as the
+            # bottom division at any rate
+            #$('<div class="graph-display-label-max"></div>')
+            #    .text(@_formatValue(absCombinedMax))
+            #    .insertBefore(detailVis[0])
+                
+            # Fix the error case where there are almost no values
+            if absCombinedMax == 0
+                absCombinedMax = 1
+                
+            for i in [0...subgroupSets[0].length]
+                # And now calculate the normalized "ynorm" component for
+                # each subgroup
+                for ds in subgroupSets
+                    # If this layer is imperceptible, set ynorm to 0
+                    av = Math.abs(ds[i].y)
+                    if ds[i].y == 0 or
+                            absCombined[i] < absCombinedMax / (2*height)
+                        ds[i].ynorm = 0
+                    else
+                        ds[i].ynorm = Math.abs(ds[i].y) / absCombined[i]
+
+            # d3.layout.stack() adds the "y0" property to dataSets, and 
+            # stacks them
+            stacksGen = d3.layout.stack().offset('zero')
+                .y((d) -> d.ynorm)
+                .out (d, y0, y) ->
+                    d.y0 = y0
+            
+            # We offer click-to-level functionality, since it can be hard
+            # to tell the trend of any individual element if it doesn't 
+            # have an edge that's a horizontal line
+            detailStackOrder = layers[layers.length - 1][1]
+            if detailStackOrder?
+                stackOrder = detailStackOrder
+            else
+                stackOrder = [0...subgroupSets.length]
+                
+            restackData = () =>
+                # Run the d3.layout.stack on a sorted version of our
+                # subgroupSets; it's nice to keep the order that
+                # we pass them to the visualization the same so 
+                # that the same colors represent the same objects
+                toStack = []
+                for i in stackOrder
+                    toStack.push(subgroupSets[i])
+                return stacksGen(toStack)
+                
+            # Perform first stack
+            restackData()
+
+            # Draw the proportional bit
+            self = @
+            area = d3.svg.area()
+            area
+                .x((d) -> (d.x - xmin) * width / (xmax - xmin))
+                .y0((d) -> height - d.y0 * height)
+                .y1((d) -> height - (d.ynorm + d.y0) * height)
+            detailVis.selectAll("path")
+                .data(subgroupSets).enter()
+                    .append("path")
+                    .style("fill", (d) -> graphColors(d.title))
+                    .attr("d", area)
+                    .on("mousemove", (d) =>
+                        val = @_eventInterp(d)
+                        valStr = @_formatValue(val)
+                        ui.Tooltip.show(d3.event, d.title + ': ' + valStr)
+                    )
+                    .on("mouseout", () => ui.Tooltip.hide())
+                    .on("click", (d, di) =>
+                        console.log(arguments)
+                        console.log(stackOrder)
+                        
+                        if di == stackOrder[0]
+                            # Already at the bottom, zoom in
+                            # Write out our current stackOrder to our
+                            # layer so that when it's restored, it will be
+                            # sorted like it was before
+                            layers[layers.length - 1][1] = stackOrder
+                            
+                            # Push a new layer and re-render
+                            layers.push([ d.group, null ])
+                            @_drawGraph_zoom_layer(options)
+                            return
+
+                        # Remove current stackOrder == di and put it at 0
+                        # Swap current 0 with stackOrder == di
+                        diPos = -1
+                        for q, j in stackOrder
+                            if q == di
+                                diPos = j
+                                break
+
+                        stackOrder = stackOrder[...diPos].concat(
+                            stackOrder[diPos + 1..])
+                        stackOrder.unshift(di)
+                        
+                        restackData()
+                        detailVis.selectAll("path")
+                            .data(subgroupSets)
+                            .transition()
+                                .duration(1000)
+                                .attr("d", area)
+                    )
+                    
+                    
+        _drawGraph_zoom_layer_linear: (options, detailVis, subgroupSets) ->
+            # Render absolute values as lines of the composite combined value,
+            # according to their magnitude
+            
+            # De-compress options
+            {layers, display, height, zoomType} = options
+            width = $(detailVis[0]).width()
+            height = $(detailVis[0]).height()
+            xmin = subgroupSets[0][0].x
+            xmax = subgroupSets[0][subgroupSets[0].length - 1].x
+            
+            # For linear, everything will be plotted on an absolute value
+            # scale from [0..greatext y value]
+            ymax = 0.0
+            for i in [0...subgroupSets[0].length]
+                for ds in subgroupSets
+                    ymax = Math.max(ymax, Math.abs(ds[i].y))
+                
+            $('<div class="graph-display-label-max"></div>')
+                .text(@_formatValue(ymax))
+                .insertBefore(detailVis[0])
+                    
+            # Fix the error case
+            if ymax == 0
+                ymax = 1
+                
+            # And now calculate the normalized "ynorm" component for
+            # each subgroup at each point... except split it into ynormp and
+            # ynormn, since negative and positive lines should be colored 
+            # slightly differently.
+            for i in [0...subgroupSets[0].length]
+                for ds in subgroupSets
+                    ds[i].ynormp = 0.0
+                    ds[i].ynormn = 0.0
+                    if ds[i].y > 0
+                        ds[i].ynormp = ds[i].y / ymax
+                    else
+                        ds[i].ynormn = -ds[i].y / ymax
+
+            # Draw the proportional bit
+            normWidth = '2px'
+            selWidth = '5px'
+            
+            # Set up mouse handler here since we use it for both positive 
+            # and negative
+            self = @
+            mousemove = (d) ->
+                val = self._eventInterp(d)
+                valStr = self._formatValue(val)
+                ui.Tooltip.show(d3.event, d.title + ': ' + valStr)
+                # Make this line thicker
+                $(@).css("stroke-width", selWidth)
+            mouseout = (d) ->
+                ui.Tooltip.hide()
+                $(@).css("stroke-width", normWidth)
+            click = (d) =>
+                # Push a new layer and re-render
+                layers.push([ d.group, null ])
+                @_drawGraph_zoom_layer(options)
+                
+            linep = d3.svg.line()
+                .interpolate('monotone')
+                .x((d) => (d.x - xmin) * width / (xmax - xmin))
+                .y((d) => height - d.ynormp * height)
+            linen = d3.svg.line()
+                .interpolate('monotone')
+                .x((d) => (d.x - xmin) * width / (xmax - xmin))
+                .y((d) => height - d.ynormn * height)
+                
+            visData = detailVis.selectAll("path").data(subgroupSets).enter()
+            
+            # Positives!
+            visData
+                .append("path")
+                .attr("class", "line")
+                .style("stroke", (d) => graphColors(d.title))
+                .style("stroke-width", normWidth)
+                .style("fill", "none")
+                .attr("d", linep)
+                .on("mousemove", mousemove)
+                .on("mouseout", mouseout)
+                .on("click", click)
+                
+            # Negatives!
+            visData
+                .append("path")
+                .attr("class", "line")
+                .style("stroke", (d) => @_getNegativeColor(d.title))
+                .style("stroke-width", normWidth)
+                .style("fill", "none")
+                .attr("d", linen)
+                .on("mousemove", mousemove)
+                .on("mouseout", mouseout)
+                .on("click", click)
 
 
         _eventInterp: (dataSet) ->
@@ -837,6 +983,21 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             if bs.length < 2
                 bs = "0" + bs
             return '#' + rs + gs + bs
+            
+            
+        _getNegativeColor: (colorKey) ->
+            ### Get lighter colors for rendering a negative magnitude section
+            of the given colorKey
+            ###
+            # Slightly lighter
+            c = graphColors(colorKey)
+            r = parseInt(c[1..2], 16)
+            g = parseInt(c[3..4], 16)
+            b = parseInt(c[5..6], 16)
+            r += (255 - r) * 0.3
+            g += (255 - g) * 0.3
+            b += (255 - b) * 0.3
+            return @_getColorHex(r, g, b)
             
             
         _hashString: (str) ->
@@ -1036,19 +1197,17 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             if @config.type == 'area'
                 @_drawGraph_area.apply(@, drawGraphArgs)
             else if @config.type == 'area-zoom'
-                @_drawGraph_areaZoom.apply(@, drawGraphArgs)
+                drawGraphArgs.push('area')
+                @_drawGraph_zoom.apply(@, drawGraphArgs)
+            else if @config.type == 'linear-zoom'
+                drawGraphArgs.push('linear')
+                @_drawGraph_zoom.apply(@, drawGraphArgs)
             else
                 throw "Unknown graph type: " + @config.type
 
             # Remove loaded message
             loadedText.remove()
-            
-    # d3.scale.category20 does something cool - it returns a method that gives
-    # you a color from a rotating list of 20.  What's cool is that it keeps
-    # a map of values it has seen before - that is, if we keep a global
-    # category20 instance on Graph, then any graphed value will always have
-    # the exact same color in all of our graphs.  Yay!
-    Graph.colors = d3.scale.category20()
+
     return Graph
 
 

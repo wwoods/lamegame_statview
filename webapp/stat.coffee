@@ -50,7 +50,9 @@ define [], (Stat) ->
             if match
                 result = {}
                 for group, i in @groups
-                    result[group] = match[i + 1]
+                    # Just like in statPath, every other group is our actual
+                    # group
+                    result[group] = match[2*(i + 1)]
             return result
 
     

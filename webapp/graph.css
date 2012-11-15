@@ -39,7 +39,7 @@
     cursor: pointer;
     /* Align after controls collapser */
     position: relative;
-    left: 1.2em;
+    left: 1.6em;
 }
 .graph-title:hover {
     background-color: #eee;
@@ -64,5 +64,11 @@
 .graph-display > svg {
     /* Needed to remove whitespace */
     display: block;
+}
+
+.graph-display-label-max {
+    /* Inserted immediately before the SVG it annotates */
+    position: absolute;
+    padding-top: 1px;
 }
 

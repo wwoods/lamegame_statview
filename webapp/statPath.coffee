@@ -3,7 +3,8 @@ define [], () ->
         constructor: (pathOptions) ->
             @options = pathOptions
             # TODO - Stats should get options from specific members of @options
-            @statOptions = undefined
+            @statOptions =
+                type: if @options.type then @options.type else 'count'
             path = @options.path
 
             # Find groups in our path
@@ -27,17 +28,37 @@ define [], () ->
 
         getRegexForPath: (path, type = "stat") ->
             # Return a regex that matches the given path and type
+            # Note that, in order to perfectly find where our matched groups
+            # are, we need to have each individual segment of the regex in
+            # a capturing group.
             findGroup = /{([^}]*)}/g
             reString = (
                     '^' + path.replace(/\./g, '\\.')
                             .replace(findGroup, '([^\\.]*)')
             )
+            
+            # Extra note - we're tricky.  We insert a group in between each
+            # actually wanted capturing group, meaning that the odd-indexed
+            # captures are our actual groups.
+            lastParenEnd = -1
+            while (nextParen = reString.indexOf('(', lastParenEnd)) >= 0
+                reString = reString[...lastParenEnd + 1] + '(' +
+                        reString[lastParenEnd + 1...nextParen] + ')' +
+                        reString[nextParen..]
+                # And we've added two chars, so..
+                lastParenEnd = reString.indexOf(')', nextParen + 2)
+                if lastParenEnd < 0
+                    throw "Bad regex: " + reString
+            # From lastParenEnd to end is final capture group
+            reString = reString[...lastParenEnd + 1] + '(' + 
+                    reString[lastParenEnd + 1..]
             if type == 'dir'
-                reString += '\\.[^\\.]*$'
+                reString += '\\.[^\\.]*'
             else if type == 'superdir'
-                reString += '\\..*$'
-            else
-                reString += '$'
+                reString += '\\..*'
+
+            # Close out regex and make sure it's a complete match
+            reString += ')$'
             return new RegExp(reString, 'g')
 
 
@@ -60,21 +81,21 @@ define [], () ->
                 return match
 
             for group, i in @groups
-                result.groups.push([ group, match[i + 1] ])
+                # Remember, we put capture groups between the groups we
+                # care about, so even indices are group values
+                result.groups.push([ group, match[2 * (i + 1)] ])
 
-            name = match[0]
-            for i in [1..@groups.length]
-                toReplace = match[i]
-                if i == 1 and @path[0] == '{'
-                    toReplace += '.'
-                else
-                    toReplace = '.' + toReplace
+            statName = '' # construct stat name from odd captured groups
+            for i in [1...match.length]
+                if i % 2 == 0
+                    continue
+                statName += match[i]
+            
+            # Make it pretty - take out double or more dots, since they're 
+            # leftovers from filtered groups
+            statName = statName.replace(/\.\.+/g, '.')
 
-                # Javascript string replace only replaces first instance, which
-                # is exactly what we want
-                name = name.replace(toReplace, '')
-
-            result.name = name
+            result.name = statName
             if @type == 'dir' or @type == 'superdir'
                 statPart = result.name[result.name.lastIndexOf('.') + 1 ..]
                 result.path = @path + '.' + statPart
