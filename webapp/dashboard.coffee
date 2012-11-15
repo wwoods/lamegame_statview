@@ -86,7 +86,8 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
 
 
         _resizeCell: (cell) ->
-            w = @width() / @columns
+            # Subtract 1 to ensure that the number of columns is accurate
+            w = (@width() - 1) / @columns
             h = Math.min(w * @ratio, $(window).height() - @app.header.height())
             cell.css
                 width: w
