@@ -87,6 +87,8 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
 
         _resizeCell: (cell) ->
             # Subtract 1 to ensure that the number of columns is accurate
+            if not cell?
+                return
             w = (@width() - 1) / @columns
             h = Math.min(w * @ratio, $(window).height() - @app.header.height())
             cell.css
@@ -99,9 +101,13 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             super('<div class="dashboard"></div>')
 
             @container = new DashboardContainer(definition, columns).appendTo(@)
-
-            $(window).resize () =>
+            
+            mySizer = () => 
+                if @closest('body').length == 0
+                    # No longer in dom
+                    $(window).unbind("resize", mySizer)
                 @container.resize()
+            $(window).resize(mySizer)
 
 
         changeColumns: (i) ->
