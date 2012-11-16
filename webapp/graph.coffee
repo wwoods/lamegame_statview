@@ -324,24 +324,23 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                                 if nzStatsInRange == 0
                                     movingTotal = 0.0
                     else if stat.type == 'total'
+                        v = parseFloat(rawData[movingIndex])
                         if timeLeft >= partLeft
                             # Take off the whole rest of the point
-                            movingTotal -= (
-                                    parseFloat(rawData[movingIndex]) *
+                            movingTotal -= (v *
                                     partLeft / srcInterval)
                             movingTime = movingTimeBase + srcInterval
                             movingTimeBase = movingTime
                             movingIndex += 1
-                        else
-                            # Take off part of the point and we're done
-                            v = parseFloat(rawData[movingIndex])
-                            movingTotal -= (v *
-                                    timeLeft / srcInterval)
-                            movingTime = newTail
                             if v != 0
                                 nzStatsInRange -= 1
                                 if nzStatsInRange == 0
                                     movingTotal = 0.0
+                        else
+                            # Take off part of the point and we're done
+                            movingTotal -= (v *
+                                    timeLeft / srcInterval)
+                            movingTime = newTail
 
                 while srcIndex < rawData.length and srcTime < pointTime
                     # Moving summation
