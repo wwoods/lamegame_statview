@@ -268,6 +268,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                         @_paths = data.paths
                         @_statsController.parseStats(@_paths)
                         console.log(@_statsController)
+                        window.sc = @_statsController
 
                         @empty()
                         @header = new StatsHeader(@, data.dashboards)

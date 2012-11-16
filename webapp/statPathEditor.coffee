@@ -84,7 +84,6 @@ define ["cs!lib/ui", "css!statPathEditor"], (ui) ->
                     newDef =
                         id: @_newPathId()
                         path: ''
-                        isDirty: true
                     @options.paths.push(newDef)
                     @pathTable.append(new PathRow(newDef))
                 )

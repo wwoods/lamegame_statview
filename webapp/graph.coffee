@@ -287,6 +287,11 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             movingTime = srcTime
             # The start of current point
             movingTimeBase = movingTime
+            
+            # In order to get true zeros when we have no stats counted,
+            # keep track of the number of stats in our range
+            # nz - non-zero
+            nzStatsInRange = 0
 
             for pointTime in pointTimes
                 # We're actually going to compute a moving sum of partial data
@@ -309,10 +314,15 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                             movingTime = newTail
                         else
                             # Remove the whole value
-                            movingTotal -= parseFloat(rawData[movingIndex])
+                            v = parseFloat(rawData[movingIndex])
+                            movingTotal -= v
                             movingTime = movingTimeBase + srcInterval
                             movingTimeBase = movingTime
                             movingIndex += 1
+                            if v != 0
+                                nzStatsInRange -= 1
+                                if nzStatsInRange == 0
+                                    movingTotal = 0.0
                     else if stat.type == 'total'
                         if timeLeft >= partLeft
                             # Take off the whole rest of the point
@@ -324,10 +334,14 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                             movingIndex += 1
                         else
                             # Take off part of the point and we're done
-                            movingTotal -= (
-                                    parseFloat(rawData[movingIndex]) *
+                            v = parseFloat(rawData[movingIndex])
+                            movingTotal -= (v *
                                     timeLeft / srcInterval)
                             movingTime = newTail
+                            if v != 0
+                                nzStatsInRange -= 1
+                                if nzStatsInRange == 0
+                                    movingTotal = 0.0
 
                 while srcIndex < rawData.length and srcTime < pointTime
                     # Moving summation
@@ -338,7 +352,10 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                         # We want the first instance to count for everything
                         if srcTime == srcTimeBase
                             # We're at first point, add it
-                            movingTotal += parseFloat(rawData[srcIndex])
+                            v = parseFloat(rawData[srcIndex])
+                            movingTotal += v
+                            if v != 0
+                                nzStatsInRange += 1
 
                         # Are we going to a new point?
                         if timeLeft >= partLeft
@@ -348,17 +365,21 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                         else
                             srcTime = pointTime
                     else if stat.type == 'total'
+                        # First instance of this point entering our range?
+                        v = parseFloat(rawData[srcIndex])
+                        if srcTime == srcTimeBase and v != 0
+                            nzStatsInRange += 1
+                            
                         if timeLeft >= partLeft
                             # Rest of the point!
-                            movingTotal += (
-                                    parseFloat(rawData[srcIndex]) *
+                            movingTotal += (v *
                                     partLeft / srcInterval)
                             srcTime = srcTimeBase + srcInterval
                             srcTimeBase = srcTime
                             srcIndex += 1
                         else
                             # Partial point and done
-                            movingTotal += (parseFloat(rawData[srcIndex]) *
+                            movingTotal += (v *
                                     timeLeft / srcInterval)
                             srcTime = pointTime
 
@@ -380,6 +401,50 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
 
             # Done!
             return result
+            
+            
+        _calculateSanitize: (allVals, sum) ->
+            ### Given a set of non-zero absolute values and their sum, 
+            calculate the upper bound to display for a sanitized view.
+            ###
+            lessVals = allVals
+            while true
+                avg = d3.mean(lessVals)
+                stddev = 0.0
+                for v in lessVals
+                    stddev += Math.pow(v - avg, 2)
+                stddev = Math.sqrt(stddev / lessVals.length)
+                
+                if stddev <= avg * 4 + 1e-6
+                    break
+                    
+                # Another iteration; crop anything outside the first deviation
+                lessVals = lessVals.filter((a) -> a <= avg + stddev * 2)
+                    
+            return avg + stddev * 5
+                
+                
+            stddev = 0.0
+            for v in allVals
+                stddev += Math.pow(v - avg, 2)
+            stddev = Math.sqrt(stddev / allVals.length)
+            
+            # Ok, now that we have our standard deviation, do it again, but
+            # this time only include values within 2 standard deviations.
+            # This smooths out extreme peaks nicely
+            top = avg + stddev * 2
+            lessVals = allVals.filter((a) -> a <= top)
+            
+            # Re-calculate stddev, and use that amount
+            stddev2 = 0.0
+            newAvg = d3.mean(lessVals)
+            for v in lessVals
+                stddev2 += Math.pow(v - newAvg, 2)
+            stddev2 = Math.sqrt(stddev2 / lessVals.length)
+            
+            # Since the remaining points are considered "sane", we include a
+            # lot more standard deviations
+            return newAvg + stddev2 * 5
         
         
         _drawAxis: (options) ->
@@ -649,22 +714,15 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             if @_sanitize
                 # Use 2 standard deviations for cap
                 sum = 0.0
-                count = 0
+                allVals = []
                 for pt in combined
                     v = Math.abs(pt.y)
                     if v > 0
                         # Don't count points that don't have scale; we're more
                         # interested in the deviation of valued points
                         sum += v
-                        count += 1
-                avg = sum / count
-                stddev = 0.0
-                for pt in combined
-                    v = Math.abs(pt.y)
-                    if v > 0
-                        stddev += Math.pow(v - avg, 2)
-                stddev = Math.sqrt(stddev / count)
-                topStddev = avg + stddev * 2
+                        allVals.push(v)
+                topStddev = @_calculateSanitize(allVals, sum)
                 if topStddev < realMax
                     isCapped = true
                     realMax = topStddev
@@ -899,7 +957,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             if @_sanitize
                 # Use 2 standard deviations for cap
                 sum = 0.0
-                count = 0
+                allVals = []
                 for i in [0...subgroupSets[0].length]
                     for ds in subgroupSets
                         v = Math.abs(ds[i].y)
@@ -907,16 +965,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                             # Don't count points that don't have scale; we're 
                             # more interested in the deviation of valued points
                             sum += v
-                            count += 1
-                avg = sum / count
-                stddev = 0.0
-                for i in [0...subgroupSets[0].length]
-                    for ds in subgroupSets
-                        v = Math.abs(ds[i].y)
-                        if v > 0
-                            stddev += Math.pow(v - avg, 2)
-                stddev = Math.sqrt(stddev / count)
-                topStddev = avg + stddev * 2
+                            allVals.push(v)
+                            
+                topStddev = @_calculateSanitize(allVals, sum)
                 if topStddev < ymax
                     ymax = topStddev
                     isCapped = true

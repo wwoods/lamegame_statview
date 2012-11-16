@@ -25,17 +25,20 @@ define [ 'cs!statPath', 'cs!stat' ], (StatPath, Stat) ->
                                     
             for stat in @availableStats
                 bestResult = null
+                bestPath = null
                 for path in @statPaths
                     result = path.matchStat(stat)
                     if result == null
                         continue
                     if not bestResult? or bestResult.score < result.score
                         bestResult = result
+                        bestPath = path
                 
                 if bestResult == null
                     # No matches
                     continue
                 result = bestResult
+                path = bestPath
                     
                 # It's a match, but is this path inactive?
                 if result.inactive
