@@ -3,3 +3,5 @@ lamegame_statsview
 
 A webservice for displaying stats from graphite or lgTask.
 
+Requires jsProject: https://github.com/sellerengine/jsProject
+
