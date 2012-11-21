@@ -402,25 +402,34 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             return result
             
             
-        _calculateSanitize: (allVals, sum) ->
-            ### Given a set of non-zero absolute values and their sum, 
+        _calculateSanitize: (valSets) ->
+            ### Given a set of sets of non-zero absolute values, 
             calculate the upper bound to display for a sanitized view.
             ###
-            lessVals = allVals
-            while true
-                avg = d3.mean(lessVals)
+            
+            sanitizedMin = 0.0
+            
+            for set in valSets
+                lessVals = set
+                tries = 5 # Bound the # of standard deviation passes
+                avg = 0.0
                 stddev = 0.0
-                for v in lessVals
-                    stddev += Math.pow(v - avg, 2)
-                stddev = Math.sqrt(stddev / lessVals.length)
-                
-                if stddev <= avg * 4 + 1e-6
-                    break
+                while tries > 0 and lessVals.length > 0
+                    tries -= 1
+                    avg = d3.mean(lessVals)
+                    stddev = 0.0
+                    for v in lessVals
+                        stddev += Math.pow(v - avg, 2)
+                    stddev = Math.sqrt(stddev / lessVals.length)
                     
-                # Another iteration; crop anything outside the first deviation
-                lessVals = lessVals.filter((a) -> a <= avg + stddev * 2)
+                    if stddev <= avg * 4 + 1e-6
+                        break
+                        
+                    # Another iteration; crop anything outside the first deviation
+                    lessVals = lessVals.filter((a) -> a <= avg + stddev * 2)
+                sanitizedMin = Math.max(sanitizedMin, avg + stddev * 5)
                     
-            return avg + stddev * 5
+            return sanitizedMin
                 
                 
             stddev = 0.0
@@ -712,16 +721,14 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             # Do we need to clamp ymax / ymin?
             if @_sanitize
                 # Use 2 standard deviations for cap
-                sum = 0.0
                 allVals = []
                 for pt in combined
                     v = Math.abs(pt.y)
                     if v > 0
                         # Don't count points that don't have scale; we're more
                         # interested in the deviation of valued points
-                        sum += v
                         allVals.push(v)
-                topStddev = @_calculateSanitize(allVals, sum)
+                topStddev = @_calculateSanitize([ allVals ])
                 if topStddev < realMax
                     isCapped = true
                     realMax = topStddev
@@ -955,18 +962,18 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             # Do we need to clamp ymax?
             if @_sanitize
                 # Use 2 standard deviations for cap
-                sum = 0.0
-                allVals = []
-                for i in [0...subgroupSets[0].length]
-                    for ds in subgroupSets
+                allValSets = []
+                for ds in subgroupSets
+                    allVals = []
+                    for i in [0...subgroupSets[0].length]
                         v = Math.abs(ds[i].y)
                         if v > 0
                             # Don't count points that don't have scale; we're 
                             # more interested in the deviation of valued points
-                            sum += v
                             allVals.push(v)
+                    allValSets.push(allVals)
                             
-                topStddev = @_calculateSanitize(allVals, sum)
+                topStddev = @_calculateSanitize(allValSets)
                 if topStddev < ymax
                     ymax = topStddev
                     isCapped = true
