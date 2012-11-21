@@ -1,6 +1,6 @@
 reqs = [ 'cs!lib/ui', 'cs!stat', 'cs!controls', 'cs!dataset', 'cs!datagroup',
-        'css!graph' ]
-module = (ui, Stat, Controls, DataSet, DataGroup) ->
+        'cs!expressionEvaluator', 'css!graph' ]
+module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
     # d3.scale.category20 does something cool - it returns a method that gives
     # you a color from a rotating list of 20.  What's cool is that it keeps
     # a map of values it has seen before - that is, if we keep a global
@@ -80,22 +80,38 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             ### Parse an expression for stats, return array of stats used
             ###
             statsFound = []
-            findStat = /[a-zA-Z_][a-zA-Z0-9_.-]*/g
-            while (next = findStat.exec(expr)) != null
-                stat = @_statsController.stats[next[0]]
-                if not stat
-                    if /Math\./.test(next[0])
-                        # Math expression, OK to skip
-                        continue
+            try
+                compiled = evaler.compile(expr)
+            catch e
+                # Parser error...
+                if errorOnUndefined
+                    new ui.Dialog(
+                        body: "Cannot compile: #{ e }"
+                    )
+                    throw "Invalid expression"
                     
-                    if errorOnUndefined
-                        new ui.Dialog(body: "Cannot find stat '#{ next[0] }'")
-                        throw "Invalid expression: #{ expr }"
+                # Otherwise probably just checking as they type...
+                return []
+                
+            recurse = (e) =>
+                for k, v of e
+                    if k == "op" and v == "s"
+                        stat = @_statsController.stats[e.statName]
+                        if not stat
+                            if errorOnUndefined
+                                new ui.Dialog(
+                                    body: "Cannot find stat '#{ e.statName }'"
+                                )
+                                throw "Invalid expression: #{ expr }"
+                            
+                            # Probably parsing as they type, no need to raise
+                            continue
+                            
+                        statsFound.push(stat)
+                    else if v != null and typeof v == 'object'
+                        recurse(v)
                         
-                    # Probably just parsing as they type, no need to raise
-                    continue
-
-                statsFound.push(stat)
+            recurse(compiled.tree)
             return statsFound
 
 
@@ -1222,35 +1238,10 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
             for i in [0...self.config.graphPoints]
                 pointTimes.unshift(lastPoint)
                 lastPoint -= pointDiff
-
-            # JS Sandbox
-            # Thanks to http://stackoverflow.com/questions/543533/restricting-eval-to-a-narrow-scope
-            getMaskedEval = (scr) ->
-                ### Returns a function which, given a context ctx, evaluates
-                the expression scr and returns the result.
-
-                NOTE - For speed, previous ctx variables are NOT erased, 
-                meaning that if a value is NOT specified, it will use the
-                value from the last iteration.
-                ###
-                mask = {}
-                for p of this
-                    mask[p] = undefined
-
-                fn = new Function("with(this) { return " + scr + "}")
-
-                return (ctx) ->
-                    for p of ctx
-                        mask[p] = ctx[p]
-                    return fn.call(mask)
                     
             # Compile expr
-            expr = self.config.expr
-            for s, q in stats
-                newName = 'v' + q
-                expr = expr.replace(s.name, newName)
             try
-                myFn = getMaskedEval(expr)
+                myExpr = evaler.compile(self.config.expr)
             catch e
                 message = $("<div>Invalid Expression: 
                         <div>#{ self.config.expr }</div>
@@ -1258,7 +1249,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                 new ui.Dialog(body: message)
                 throw e
             calculateOptions =
-                fn: myFn
+                expr: myExpr
                 stats: stats
                 pointTimes: pointTimes
 
@@ -1273,16 +1264,10 @@ module = (ui, Stat, Controls, DataSet, DataGroup) ->
                 myGroups = self.config.groups.slice()
                 dataOutput = data
                 while true
-                    # Merge into current DataGroup
+                    # Add set to current DataGroup
                     if not (dataSetName of dataOutput.values)
-                        # There is no existing data at this level; do a copy
-                        dataOutput.values[dataSetName] = (
-                                dataSetData.values.slice())
-                    else
-                        # There is existing data at this level; do a merge
-                        valuesOut = dataOutput.values[dataSetName]
-                        for valueOut, j in dataSetData.values
-                            valuesOut[j] += valueOut
+                        dataOutput.values[dataSetName] = []
+                    dataOutput.values[dataSetName].push(dataSetData)
 
                     # Look for the next group that needs the data
                     next = myGroups.shift()

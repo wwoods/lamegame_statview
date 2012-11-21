@@ -1,0 +1,100 @@
+/*
+ * Grammar for parsing statistic expressions
+ * Designed using PegJS - http://pegjs.majda.cz/
+ */
+
+start
+  = expression
+
+/* Constants */
+/* White-space */
+__
+  = [ \t\n]*
+
+expression
+  = "for each" __ grp:identifier __ "add" __ expr:expression { 
+      return { "op": "forEach-sum", "group": grp, "expr": expr };
+    }
+  / addsub_expr
+
+AddSubOp
+  = "+"
+  / "-"
+
+addsub_expr
+  = head:muldiv_expr tail:(__ AddSubOp __ muldiv_expr)* { 
+      var r = head;
+      for (var i = 0, m = tail.length; i < m; i++) {
+         r = { op: tail[i][1], left: r, right: tail[i][3] };
+      }
+      return r;
+    }
+
+MulDivOp
+  = "*"
+  / "/"
+
+muldiv_expr
+  = head:simple_expr tail:(__ MulDivOp __ simple_expr)* { 
+      var r = head;
+      for (var i = 0, m = tail.length; i < m; i++) {
+         r = { op: tail[i][1], left: r, right: tail[i][3] };
+      }
+      return r;
+    }
+
+simple_expr
+  = number
+  / integer
+  / "(" __ expr:expression __ ")" { return expr; }
+  / funcCall
+  / statName
+
+funcCall
+  = name:funcName "(" args:arg_list ")" { return { "op": "call", "func": name, "args": args }; }
+
+/* We restrict the function list available */
+funcName
+  = "max"
+  / "min"
+
+arg_list
+  = head: expression tail:(__ "," __ expression)* {
+    var r = [head];
+    for (var i = 0, m = tail.length; i < m; i++) {
+      r.push(tail[i][3]);
+    }
+    return r;
+  }
+
+statName "statName"
+  = name:identifier tail:("." identifier)* { 
+      var r = name;
+      for (var i = 0, m = tail.length; i < m; i++) {
+        r += tail[i][0] + tail[i][1];
+      }
+      return { "op": "s", "statName": r };
+    }
+
+identifier
+  = name:[a-zA-Z_] nameRest:[a-zA-Z0-9_-]* {
+    return name + nameRest.join("");
+  }
+
+integer "integer"
+  = neg:"-"? digits:[0-9]+ {
+      var t = digits.join("");
+      if (neg) {
+        t = "-" + t;
+      }
+      return { "op": "c", "constant": parseInt(t, 10) };
+    }
+
+number "number"
+  = neg:"-"? digits:[0-9]* "." decimal:[0-9]* { 
+      var t = digits.join("") + '.' + decimal.join("")
+      if (neg) {
+        t = "-" + t;
+      }
+      return { "op": "c", "constant": parseFloat(t) };
+    }

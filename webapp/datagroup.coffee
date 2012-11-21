@@ -25,20 +25,12 @@ define ["cs!dataset"], (DataSet) ->
             # Decompress computeOptions
             stats = @computeOptions.stats
             pointTimes = @computeOptions.pointTimes
-            exprFn = @computeOptions.fn
+            expression = @computeOptions.expr
+
+            numPts = @values[stats[0].name][0].length
             
             exprVals = new DataSet(@, @title)
-            dgVals = @values
-            for j in [0...dgVals[stats[0].name].length]
-                ctx = {}
-                for s, q in stats
-                    vals = dgVals[s.name]
-                    ctx['v' + q] = vals[j]
-                result = exprFn(ctx)
-                exprVals.push(
-                    x: pointTimes[j]
-                    y: result
-                )
+            expression.eval(exprVals, @values, pointTimes)
                 
             # Cache and return
             @__expr__ = exprVals
