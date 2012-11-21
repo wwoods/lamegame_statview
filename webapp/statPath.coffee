@@ -15,25 +15,26 @@ define [], () ->
                 @groups.push(next[1])
 
             @path = path
-            type = 'stat'
-            if /\.\*$/.test(@path)
-                type = 'dir'
-                @path = @path[0...-2]
-            else if /\.\*\*$/.test(@path)
-                type = 'superdir'
-                @path = @path[0...-3]
-            @type = type
-            @pathRegex = @getRegexForPath(@path, @type)
+            @pathRegex = @getRegexForPath(@path)
+            
+            # Calculate the score for our path; more specific chars means
+            # a higher score
+            @score = path.replace(/\*/g, '').replace(/{([^}]*)}/g, '').length
 
 
-        getRegexForPath: (path, type = "stat") ->
-            # Return a regex that matches the given path and type
+        getRegexForPath: (path) ->
+            # Return a regex that matches the given path, after wildcard (* and
+            # **) substitutions.
             # Note that, in order to perfectly find where our matched groups
             # are, we need to have each individual segment of the regex in
             # a capturing group.
+            findDoubleStar = /\*\*/g
+            findStar = /\*/g
             findGroup = /{([^}]*)}/g
             reString = (
                     '^' + path.replace(/\./g, '\\.')
+                            .replace(findDoubleStar, '.+')
+                            .replace(findStar, '.*')
                             .replace(findGroup, '([^\\.]*)')
             )
             
@@ -52,17 +53,9 @@ define [], () ->
             # From lastParenEnd to end is final specified capture group
             reString = reString[...lastParenEnd + 1] + '(' + 
                     reString[lastParenEnd + 1..] + ')'
-                    
-            # Any non-specific stuff should go in a separate capture group
-            reString += '('
-                    
-            if type == 'dir'
-                reString += '\\.[^\\.]*'
-            else if type == 'superdir'
-                reString += '\\..*'
 
             # Close out regex and make sure it's a complete match
-            reString += ')$'
+            reString += '$'
             return new RegExp(reString, 'g')
 
 
@@ -90,31 +83,26 @@ define [], () ->
                 result.groups.push([ group, match[2 * (i + 1)] ])
 
             statName = '' # construct stat name from odd captured groups
+            statPath = '' # Build stat path at same time, replacing captured
+                          # groups with the group name
+            statPathGroupsLeft = @groups[..]
             for i in [1...match.length]
                 if i % 2 == 0
+                    statPath += '{' + statPathGroupsLeft.shift() + '}'
                     continue
                 statName += match[i]
+                statPath += match[i]
                 
-            # We score matches according to longest specified match.. since 
-            # last segment is wildcards, so this before adding the last match.
-            # Note that this includes double (or even triple) dots.  Should
-            # not affect, but good for debugging info.
-            result.score = statName.length
-            
-            # The last element is never even, but is still specific in that it
-            # only includes trailing wildcards
-            statName += match[match.length - 1]
+            # We score matches according to longest specified match.  That is,
+            # the most non-group and non-wildcard characters
+            result.score = @score
             
             # Make it pretty - take out double or more dots, since they're 
             # leftovers from filtered groups
             statName = statName.replace(/\.\.+/g, '.')
 
             result.name = statName
-            if @type == 'dir' or @type == 'superdir'
-                statPart = result.name[result.name.lastIndexOf('.') + 1 ..]
-                result.path = @path + '.' + statPart
-            else
-                result.path = @path
+            result.path = statPath
             result.pathRegex = @getRegexForPath(result.path)
             
             if @options.inactive
