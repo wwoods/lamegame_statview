@@ -61,7 +61,7 @@
     /* Prevent scroll bars from showing because of graphs */
     overflow: hidden;
 }
-.graph-display > svg {
+.graph-display svg {
     /* Needed to remove whitespace */
     display: block;
 }

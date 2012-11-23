@@ -256,20 +256,26 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             values = []
             result.values = values
             
+            aggregateType = 'count'
+            if stat.type == 'total' or stat.type == 'total-max'
+                aggregateType = 'total'
+            
             # First thing's first - if we're a total, we need to replace all
             # 'None' values with the last value.  If we're a count, just
             # replace all 'None' values with 0.
-            if stat.type == 'total'
+            if aggregateType == 'total'
                 lastValue = 0;
                 for i in [4...rawData.length]
                     if rawData[i] != 'None'
                         lastValue = rawData[i]
                     else
                         rawData[i] = lastValue
-            else if stat.type == 'count'
+            else if aggregateType == 'count'
                 for i in [4...rawData.length]
                     if rawData[i] == 'None'
                         rawData[i] = 0
+            else
+                throw "Invalid aggregateType: " + aggregateType
 
             firstTime = timeFrom
             # Don't add any post-smoothing points before timeFrom, since for
@@ -323,7 +329,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                     timeLeft = newTail - movingTime
                     partLeft = movingTimeBase + srcInterval - movingTime
 
-                    if stat.type == 'count'
+                    if aggregateType == 'count'
                         if timeLeft < partLeft
                             # Remove none of count's value until the data point
                             # is completely out of the window
@@ -339,7 +345,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                                 nzStatsInRange -= 1
                                 if nzStatsInRange == 0
                                     movingTotal = 0.0
-                    else if stat.type == 'total'
+                    else if aggregateType == 'total'
                         v = parseFloat(rawData[movingIndex])
                         if timeLeft >= partLeft
                             # Take off the whole rest of the point
@@ -363,7 +369,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                     timeLeft = pointTime - srcTime
                     partLeft = srcTimeBase + srcInterval - srcTime
 
-                    if stat.type == 'count'
+                    if aggregateType == 'count'
                         # We want the first instance to count for everything
                         if srcTime == srcTimeBase
                             # We're at first point, add it
@@ -379,7 +385,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                             srcIndex += 1
                         else
                             srcTime = pointTime
-                    else if stat.type == 'total'
+                    else if aggregateType == 'total'
                         # First instance of this point entering our range?
                         v = parseFloat(rawData[srcIndex])
                         if srcTime == srcTimeBase and v != 0
@@ -399,7 +405,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                             srcTime = pointTime
 
                 # Now, add!
-                if stat.type == 'count'
+                if aggregateType == 'count'
                     # For counts, if we wanted a smaller time range than
                     # the smoothing interval, we'll need to scale it down
                     if origSmooth != 0
@@ -407,7 +413,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                     else
                         # We want to use data density
                         values.push(movingTotal)
-                else if stat.type == 'total'
+                else if aggregateType == 'total'
                     # These are set values, so adjust smoothing according to
                     # the srcInterval
                     values.push(movingTotal * srcInterval / smoothSecs)
@@ -708,7 +714,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             if not $.compareObjs({}, layerData.subgroups)
                 # We have a 100% expand render to draw; reduce overall trend
                 # to 30% height
-                trendHeight *= 0.3
+                trendHeight = Math.floor(trendHeight * 0.3)
                 
                 # Come up with a list of dataSets
                 subgroupSets = []
@@ -1252,6 +1258,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 expr: myExpr
                 stats: stats
                 pointTimes: pointTimes
+                statsController: @_statsController
 
             data = new DataGroup(self.config.title, calculateOptions)
             for dataSet in dataSetsRaw

@@ -29,9 +29,13 @@ define ["expressionParser"], (parser) ->
             return total
 
     class NodeEvaluator
-        constructor: (exprTree, dataSets) ->
+        constructor: (exprTree, dataSets, statsController) ->
+            ### exprTree - Parsed tree to evaluate.
+            dataSets - actually a dataGroup's values member
+            ###
             @dataSets = dataSets
             @dataPoint = 0
+            @statsController = statsController
             @exprTree = exprTree
             # Cache splitByGroup calls
             @_splittings = {}
@@ -62,15 +66,23 @@ define ["expressionParser"], (parser) ->
                     
             evals = {}
             for group, data of subsets
-                evals[group] = new NodeEvaluator(null, data)
+                evals[group] = new NodeEvaluator(null, data, @statsController)
             @_splittings[g] = evals
             return evals
             
             
         statValue: (s) ->
             sv = 0.0
-            for q in @dataSets[s]
-                sv += q.values[@dataPoint]
+            stat = @statsController.stats[s]
+            if stat.type == 'total-max'
+                sv = null
+                for q in @dataSets[s]
+                    val = q.values[@dataPoint]
+                    if sv == null or sv < val
+                        sv = val
+            else
+                for q in @dataSets[s]
+                    sv += q.values[@dataPoint]
             return sv
 
 
@@ -83,11 +95,11 @@ define ["expressionParser"], (parser) ->
             @tree = parsed
 
 
-        eval: (dataSetOut, values, pointTimes) ->
+        eval: (dataSetOut, values, statsController, pointTimes) ->
             ### Returns the evaluated expression for all points in values at
             the given pointTimes.
             ###
-            evaluator = new NodeEvaluator(@tree, values)
+            evaluator = new NodeEvaluator(@tree, values, statsController)
             for j in [0...pointTimes.length]
                 x = pointTimes[j]
                 y = evaluator.eval(j)

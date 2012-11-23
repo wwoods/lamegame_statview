@@ -30,7 +30,8 @@ define ["cs!dataset"], (DataSet) ->
             numPts = @values[stats[0].name][0].length
             
             exprVals = new DataSet(@, @title)
-            expression.eval(exprVals, @values, pointTimes)
+            expression.eval(exprVals, @values, 
+                    @computeOptions.statsController, pointTimes)
                 
             # Cache and return
             @__expr__ = exprVals

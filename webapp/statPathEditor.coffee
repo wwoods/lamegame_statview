@@ -24,6 +24,7 @@ define ["cs!lib/ui", "css!statPathEditor"], (ui) ->
             @type = new ui.ListBox().appendTo(@)
             @type.addOption("count", "Counter")
             @type.addOption("total", "Sample")
+            @type.addOption("total-max", "Sampled Max")
             if pathDef.type?
                 @type.val(pathDef.type)
             @type.bind("keyup change", () => @update())

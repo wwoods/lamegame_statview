@@ -1,7 +1,7 @@
 define [], (Stat) ->
     class Stat
         constructor: (params) ->
-            # type = 'count' or 'total'
+            # type = 'count' or 'total' or 'total-max'
             @name = params.name
             @groups = params.groups
             @path = params.path
@@ -15,7 +15,7 @@ define [], (Stat) ->
 
         getTarget: (groupValues) ->
             ###groupValues: { group : value }
-            Returns a graphite-suitable target path with *'s
+            Returns a target path with *'s for groups that are unspecified
             ###
             target = @path
             for group in @groups
@@ -24,18 +24,7 @@ define [], (Stat) ->
                 if group of groupValues
                     value = groupValues[group]
                 target = target.replace(toReplace, value)
-
-            if true
-                # We're using graphite, no need
-            else if @type == 'count'
-                ntarget = 'aliasSub(aliasSub(transformNull(sumSeries('
-                ntarget += target
-                ntarget += '), 0), ".*sumSeries\\(", ""), "\\).*", "")'
-                target = ntarget
-            else if @type == 'total'
-                target = 'blah'
-            else
-                throw 'Unknown type ' + @type
+                
             return target
 
 
