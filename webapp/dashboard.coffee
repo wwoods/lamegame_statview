@@ -26,6 +26,7 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
                 root: '<div class="dashboard-container"></div>'
                 handleSelector: '.controls-collapse'
                 afterDrag: () => @trigger("needs-save")
+                isLinear: false
 
             @columns = columns
             @ratio = 0.618 # height / width
@@ -37,7 +38,7 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
 
                 @_createNew = new DashboardNew()
                 @_createNew.bind "click", () =>
-                    @append(new Graph({}, @dashboard))
+                    @append(new Graph(null, @dashboard))
                 @_createNew = @append(@_createNew)
 
                 if definition?
