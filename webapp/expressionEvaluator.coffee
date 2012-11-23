@@ -74,6 +74,10 @@ define ["expressionParser"], (parser) ->
         statValue: (s) ->
             sv = 0.0
             stat = @statsController.stats[s]
+            if not @dataSets[s]?
+                # No data, return 0
+                return sv
+                
             if stat.type == 'total-max'
                 sv = null
                 for q in @dataSets[s]
