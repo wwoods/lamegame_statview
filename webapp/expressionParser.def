@@ -80,7 +80,7 @@ statLimits
   }
 
 statLimit
-  = group:identifier __ "=" __ value:identifier {
+  = group:identifier __ "=" __ value:valueOrRegex {
       return { "op": "groupEqual", "group": group, "value": value };
     }
 
@@ -93,10 +93,17 @@ statName "statName"
       return { "op": "s", "statName": r };
     }
 
+valueOrRegex
+  = id:identifier { return { "op": "value", "value": id }; }
+  / re:regex { return re; }
+
 identifier
   = name:[a-zA-Z_] nameRest:[a-zA-Z0-9_-]* {
       return name + nameRest.join("");
     }
+
+regex
+  = "/" re:[^/]+ "/" { return { "op": "regex", "regex": re.join("") }; }
 
 integer "integer"
   = neg:"-"? digits:[0-9]+ {

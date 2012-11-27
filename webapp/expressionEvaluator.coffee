@@ -29,8 +29,16 @@ define ["expressionParser"], (parser) ->
                 total += subeval.v(n.expr)
             return total
             
+    getValueAsRegex = (v) ->
+        if v.op == "value"
+            return new RegExp('^' + v.value + '$')
+        else if v.op == "regex"
+            return new RegExp('^' + v.regex + '$')
+        else
+            throw "Unknown value type: #{ v.op }"
+            
     statLimitTree =
-        "groupEqual": (q, n) -> q.groups[n.group] == n.value
+        "groupEqual": (q, n) -> getValueAsRegex(n.value).test(q.groups[n.group])
 
     class NodeEvaluator
         constructor: (exprTree, dataSets, statsController) ->
