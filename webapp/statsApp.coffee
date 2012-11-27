@@ -111,6 +111,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                 # Should show some confirmation, but...
                 @app.changeDashboard()
                 @namer.val('')
+                @app.setTitle('Unnamed')
                 return
 
             definition = null
@@ -245,6 +246,9 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                         @picker.select(newName)
                     finally
                         @_noRefresh = false
+                        
+                    # Update application title from new ID
+                    @app.setTitle(newName)
                     
                     # And get rid of (unsaved) since it's been saved
                     @picker.remove('(unsaved)')
@@ -255,6 +259,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
         constructor: () ->
             super('<div class="stats-app"></div>')
             self = @
+            @siteTitle = document.title
 
             @text('Loading, please wait')
             $.ajax(
@@ -290,6 +295,8 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             if @dashboard?
                 oldCols = @dashboard.container.columns
                 @dashboard.remove()
+            if definition?
+                @setTitle(definition.id)
             @dashboard = new Dashboard(definition, oldCols).appendTo(@)
             # Avoid initial set of loads
             @dashboard.bind('needs-save', () => @header.needsSave())
@@ -313,6 +320,10 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             ###
             @css
                 paddingTop: @header.outerHeight(true)
+                
+                
+        setTitle: (title) ->
+            document.title = title + ' - ' + @siteTitle
                     
                     
         _onHashChange: (hash, isFirst) ->
