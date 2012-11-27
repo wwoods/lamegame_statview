@@ -6,6 +6,7 @@ define ["expressionParser"], (parser) ->
     opTree =
         "c": (e, n) -> n.constant
         "s": (e, n) -> e.statValue(n.statName)
+        "limitedStat": (e, n) -> e.statValue(n.stat.statName, n.limits)
         "+": (e, n) -> e.v(n.left) + e.v(n.right)
         "-": (e, n) -> e.v(n.left) - e.v(n.right)
         "*": (e, n) -> e.v(n.left) * e.v(n.right)
@@ -27,6 +28,9 @@ define ["expressionParser"], (parser) ->
                 subeval.dataPoint = e.dataPoint
                 total += subeval.v(n.expr)
             return total
+            
+    statLimitTree =
+        "groupEqual": (q, n) -> q.groups[n.group] == n.value
 
     class NodeEvaluator
         constructor: (exprTree, dataSets, statsController) ->
@@ -71,7 +75,7 @@ define ["expressionParser"], (parser) ->
             return evals
             
             
-        statValue: (s) ->
+        statValue: (s, sLimits) ->
             sv = 0.0
             stat = @statsController.stats[s]
             if not @dataSets[s]?
@@ -81,13 +85,30 @@ define ["expressionParser"], (parser) ->
             if stat.type == 'total-max'
                 sv = null
                 for q in @dataSets[s]
+                    if not @testLimit(q, sLimits)
+                        continue
                     val = q.values[@dataPoint]
                     if sv == null or sv < val
                         sv = val
             else
                 for q in @dataSets[s]
+                    if not @testLimit(q, sLimits)
+                        continue
                     sv += q.values[@dataPoint]
             return sv
+
+
+        testLimit: (dataSet, sLimits) ->
+            ### Return true if this dataSet adheres to the given limits; false
+            if it does not.
+            ###
+            if not sLimits?
+                # No limits - everything's ok!
+                return true
+            for l in sLimits
+                if not statLimitTree[l.op](dataSet, l)
+                    return false
+            return true
 
 
         v: (node) ->

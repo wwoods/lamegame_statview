@@ -48,6 +48,9 @@ simple_expr
   / integer
   / "(" __ expr:expression __ ")" { return expr; }
   / funcCall
+  / stat:statName "[" limits:statLimits "]" {
+      return { "op": "limitedStat", "stat": stat, "limits": limits };
+    }
   / statName
 
 funcCall
@@ -67,6 +70,20 @@ arg_list
     return r;
   }
 
+statLimits
+  = head:statLimit tail:(__ "," __ statLimit)* {
+    var r = [head];
+    for (var i = 0, m = tail.length; i < m; i++) {
+      r.push(tail[i][3]);
+    }
+    return r;
+  }
+
+statLimit
+  = group:identifier __ "=" __ value:identifier {
+      return { "op": "groupEqual", "group": group, "value": value };
+    }
+
 statName "statName"
   = name:identifier tail:("." identifier)* { 
       var r = name;
@@ -78,8 +95,8 @@ statName "statName"
 
 identifier
   = name:[a-zA-Z_] nameRest:[a-zA-Z0-9_-]* {
-    return name + nameRest.join("");
-  }
+      return name + nameRest.join("");
+    }
 
 integer "integer"
   = neg:"-"? digits:[0-9]+ {

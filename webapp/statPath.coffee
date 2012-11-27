@@ -100,6 +100,12 @@ define [], () ->
             # Make it pretty - take out double or more dots, since they're 
             # leftovers from filtered groups
             statName = statName.replace(/\.\.+/g, '.')
+            # Also trim leading or trailing dashes, since, while they are valid
+            # in a path name, they are indistinguishable with subtraction
+            # if we allow them at the end, which may be confusing (and isn't
+            # pretty; normally there will be a dash at the end because a group
+            # is only part of the name).
+            statName = statName.replace(/-$/, '').replace(/^-/, '')
 
             result.name = statName
             result.path = statPath
