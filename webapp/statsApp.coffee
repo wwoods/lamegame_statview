@@ -260,6 +260,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             super('<div class="stats-app"></div>')
             self = @
             @siteTitle = document.title
+            window.debug = false
 
             @text('Loading, please wait')
             $.ajax(

@@ -703,8 +703,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             # Get combined before bothering with details view, since we need
             # xmin and xmax
             combined = layerData.getGraphPoints()
-            console.log("combined")
-            console.log(combined)
+            if window.debug
+                console.log("combined")
+                console.log(combined)
             
             { xmin, xmax, ymin, ymax } = combined.getBounds()
 
@@ -927,8 +928,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                     )
                     .on("mouseout", () => ui.Tooltip.hide())
                     .on("click", (d, di) =>
-                        console.log(arguments)
-                        console.log(stackOrder)
+                        if window.debug
+                            console.log(arguments)
+                            console.log(stackOrder)
                         
                         if di == stackOrder[0]
                             # Already at the bottom, zoom in
@@ -1290,8 +1292,10 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                         dataOutput.subgroups[nextValue] = new DataGroup(
                                 nextTitle, calculateOptions)
                     dataOutput = dataOutput.subgroups[nextValue]
-            console.log("data")
-            console.log(data)
+                    
+            if window.debug
+                console.log("data")
+                console.log(data)
 
             # ---- Draw the graph ----
             tickHeight = 20
