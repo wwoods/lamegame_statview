@@ -39,6 +39,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             
             @append('&nbsp;&nbsp;&nbsp;&nbsp;')
             @sanitize = false
+            @columns = 2
             @globalFilters = {}
             @globalFilters_doc = "Dict of filters: { group: [ values ] }"
             @optionsEdit = new ui.Base(
@@ -71,7 +72,9 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                 )
                 .appendTo(@)
                 .bind("click", () =>
-                    @app.dashboard.changeColumns(-1)
+                    @columns = Math.max(@columns - 1, 1)
+                    @app.dashboard.changeColumns(@columns)
+                    @_hashUpdate()
                 )
             @columnAdd = new ui.Base(
                     '<div class="stats-header-button">+</div>'
@@ -79,7 +82,9 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                 )
                 .appendTo(@)
                 .bind("click", () =>
-                    @app.dashboard.changeColumns(1)
+                    @columns += 1
+                    @app.dashboard.changeColumns(@columns)
+                    @_hashUpdate()
                 )
                 
             @pathPicker = new ui.Base(
@@ -102,27 +107,26 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             # Since we're changing to a defined dashboard, that means we no
             # longer need (unsaved)
             @picker.remove('(unsaved)')
-            
-            # At this point, we're definitely navigating to a dashboard,
-            # so set the hash
-            @_hashUpdate()
 
             if newVal == '(new)'
                 # Should show some confirmation, but...
                 @app.changeDashboard()
                 @namer.val('')
                 @app.setTitle('Unnamed')
-                return
-
-            definition = null
-            for d in @dashboards
-                if d.id == newVal
-                    definition = d
-                    break
-
-            if definition
-                @app.changeDashboard(definition)
-                @namer.val(definition.id)
+            else
+                definition = null
+                for d in @dashboards
+                    if d.id == newVal
+                        definition = d
+                        break
+    
+                if definition
+                    @app.changeDashboard(definition)
+                    @namer.val(definition.id)
+            
+            # At this point, we've navigated to a dashboard,
+            # so set the hash
+            @_hashUpdate()
                 
                 
         deleteDash: () ->
@@ -162,6 +166,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             viewDef =
                 view: @picker.val()
                 timeAmt: @timeAmt.val()
+                columns: @app.dashboard.container.columns
             if @sanitize
                 viewDef.sanitize = true
             if not $.compareObjs({}, @globalFilters)
@@ -292,13 +297,12 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
 
         changeDashboard: (definition) ->
             # Change to the given dashboard
-            oldCols = 2
             if @dashboard?
-                oldCols = @dashboard.container.columns
                 @dashboard.remove()
             if definition?
                 @setTitle(definition.id)
-            @dashboard = new Dashboard(definition, oldCols).appendTo(@)
+            cols = @header.columns
+            @dashboard = new Dashboard(definition, cols).appendTo(@)
             # Avoid initial set of loads
             @dashboard.bind('needs-save', () => @header.needsSave())
             
@@ -354,6 +358,8 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                         @header.sanitize = true
                     else
                         @header.sanitize = false
+                    if obj.columns
+                        @header.columns = obj.columns
                     @header.picker.select(obj.view)
                 else
                     throw "Unknown hash: " + hash

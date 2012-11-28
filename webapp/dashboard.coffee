@@ -118,9 +118,7 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
 
 
         changeColumns: (i) ->
-            @container.columns += i
-            if @container.columns < 1
-                @container.columns = 1
+            @container.columns = i
             @container.resize()
             
             
