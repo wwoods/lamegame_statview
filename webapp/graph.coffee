@@ -208,6 +208,10 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 timeAmt = @dashboard.getTimeAmt()
             timeFrom = timeTo - self.parseInterval(timeAmt)
             
+            smoothAmt = self.config.smoothOver
+            if smoothAmt == ''
+                smoothAmt = @dashboard.getSmoothAmt()
+            
             # Update _sanitize
             @_sanitize = false
             if @dashboard.getSanitize()
@@ -215,12 +219,12 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 
             requestBase =
                 timeFrom: Math.floor(timeFrom - 
-                        self.parseInterval(self.config.smoothOver))
+                        self.parseInterval(smoothAmt))
                 timeTo: Math.floor(timeTo)
                 
             requests = []
             i = 0
-            batch = 100
+            batch = 300
             while i < targets.length
                 u = i + batch
                 if u > targets.length
@@ -242,7 +246,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 makeNext()
             makeNext = =>
                 if requests.length == 0
-                    self._onLoaded(loadedData, timeFrom, timeTo, stats)
+                    self._onLoaded(loadedData, timeFrom, timeTo, 
+                            stats: stats, smoothAmt: smoothAmt)
                 else
                     r = requests.pop()
                     $.ajax('getData', {
@@ -254,7 +259,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             makeNext()
 
 
-        _aggregateSourceData: (rawData, pointTimes, timeFrom) ->
+        _aggregateSourceData: (rawData, pointTimes, timeFrom, smoothAmt) ->
             # Searches our statsController's stats for the stat matching
             # rawLine, and aggregates it appropriately according to the stat
             # type
@@ -318,7 +323,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             # Note that philosophically we consider the time in each pointTimes
             # record to be from immediately after the last point time up to and
             # including the next pointTime.
-            smoothSecs = self.parseInterval(self.config.smoothOver)
+            smoothSecs = self.parseInterval(smoothAmt)
             # Keep track of originally requested smoothing so that constants
             # affect the post-aggregated result of equations
             origSmooth = smoothSecs
@@ -1223,9 +1228,11 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                         groupIndex + 1, groupValues)
 
 
-        _onLoaded: (dataRaw, timeFrom, timeTo, stats) ->
+        _onLoaded: (dataRaw, timeFrom, timeTo, options) ->
             # timeTo is passed since it might be defined according to the 
             # request (timeFrom as well).  stats passed to avoid re-parsing.
+            {stats, smoothAmt} = options
+            
             self = this
             self._display.empty()
             self._loadingOverlay.empty()
@@ -1296,7 +1303,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 # data set according to the groups we've been asked to divide
                 # across
                 dataSetData = self._aggregateSourceData(dataSet, pointTimes,
-                        timeFrom)
+                        timeFrom, smoothAmt)
                 dataSetName = dataSetData.stat.name
                 myGroups = self.config.groups.slice()
                 dataOutput = data

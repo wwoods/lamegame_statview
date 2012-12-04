@@ -143,6 +143,10 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             
         getSanitize: () ->
             return ui.fromDom('.stats-header').sanitize
+            
+            
+        getSmoothAmt: () ->
+            return ui.fromDom('.stats-header').smoothAmt.val()
 
 
         getTimeAmt: () ->

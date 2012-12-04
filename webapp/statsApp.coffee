@@ -37,6 +37,13 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                     @refresh.trigger("click")
             @append(" (hours/days/weeks/years)")
             
+            @append(" over ")
+            @smoothAmt = $('<input type="text" />').appendTo(@)
+            @smoothAmt.val('1 hour')
+            @smoothAmt.bind "keyup", (e) =>
+                if e.which == 13 # enter
+                    @refresh.trigger("click")
+            
             @append('&nbsp;&nbsp;&nbsp;&nbsp;')
             @sanitize = false
             @columns = 2
@@ -166,6 +173,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             viewDef =
                 view: @picker.val()
                 timeAmt: @timeAmt.val()
+                smoothAmt: @smoothAmt.val()
                 columns: @app.dashboard.container.columns
             if @sanitize
                 viewDef.sanitize = true
@@ -350,6 +358,8 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                 if obj.view?
                     if obj.timeAmt?
                         @header.timeAmt.val(obj.timeAmt)
+                    if obj.smoothAmt?
+                        @header.smoothAmt.val(obj.smoothAmt)
                     if obj.filters?
                         @header.globalFilters = obj.filters
                     else
