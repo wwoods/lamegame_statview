@@ -212,18 +212,46 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             @_sanitize = false
             if @dashboard.getSanitize()
                 @_sanitize = true
+                
+            requestBase =
+                timeFrom: Math.floor(timeFrom - 
+                        self.parseInterval(self.config.smoothOver))
+                timeTo: Math.floor(timeTo)
+                
+            requests = []
+            i = 0
+            batch = 100
+            while i < targets.length
+                u = i + batch
+                if u > targets.length
+                    u = targets.length
+                request = $.extend true, {}, requestBase
+                request.targetListJson = JSON.stringify(targets[i...u])
+                requests.push(request)
+                i += batch
+                
+            loadedData = null
 
-            $.ajax('getData', {
-                type: 'POST'
-                data: {
-                    targetListJson: JSON.stringify(targets)
-                    timeFrom: Math.floor(timeFrom - self.parseInterval(
-                            self.config.smoothOver))
-                    timeTo: Math.floor(timeTo)
-                }
-                success: (data) -> self._onLoaded(data, timeFrom, timeTo, stats)
-                error: () -> self._loadingOverlay.text('(Failed to load)')
-            })
+            error = () =>
+                self._loadingOverlay.text('(Failed to load)')
+            gotNext = (data) =>
+                if not loadedData?
+                    loadedData = data
+                else
+                    loadedData += '\n' + data
+                makeNext()
+            makeNext = =>
+                if requests.length == 0
+                    self._onLoaded(loadedData, timeFrom, timeTo, stats)
+                else
+                    r = requests.pop()
+                    $.ajax('getData', {
+                        type: 'POST'
+                        data: r
+                        success: gotNext
+                        error: error
+                    })
+            makeNext()
 
 
         _aggregateSourceData: (rawData, pointTimes, timeFrom) ->
