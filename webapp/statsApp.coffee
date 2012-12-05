@@ -35,10 +35,12 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             @timeAmt.bind "keyup", (e) =>
                 if e.which == 13 # enter
                     @refresh.trigger("click")
-            @append(" (hours/days/weeks/years)")
+            @append(" (hours/days/weeks/years) ")
             
-            @append(" over ")
-            @smoothAmt = $('<input type="text" />').appendTo(@)
+            overDiv = $('<div style="white-space:nowrap;display:inline-block;"></div>')
+                .appendTo(@)
+            overDiv.append("over ")
+            @smoothAmt = $('<input type="text" />').appendTo(overDiv)
             @smoothAmt.val('1 hour')
             @smoothAmt.bind "keyup", (e) =>
                 if e.which == 13 # enter
