@@ -623,12 +623,14 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 else
                     # Hour : Minute timestamps
                     hrs = d.getHours().toString()
-                    if hrs.length < 2
-                        hrs = '0' + hrs
-                    mins = d.getMinutes().toString()
-                    if mins.length < 2
-                        mins = '0' + mins
-                    label = hrs + ':' + mins
+                    if d.getMinutes() == 0
+                        mins = 'h'
+                    else
+                        mins = d.getMinutes().toString()
+                        if mins.length < 2
+                            mins = '0' + mins
+                        mins = ':' + mins
+                    label = hrs + mins
 
                 intervals.push(
                     x: (intervalMax - xmin) * width / (xmax - xmin)
