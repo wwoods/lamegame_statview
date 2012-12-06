@@ -1153,7 +1153,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             if nval == 0
                 valStr = '0'
             else if nval > 1000000000
-                valStr = (nval / 1000000000.0).toPrecision(3) + 'G'
+                valStr = (nval / 1000000000.0).toPrecision(3) + 'B'
             else if nval > 1000000
                 valStr = (nval / 1000000.0).toPrecision(3) + 'M'
             else if nval > 1000
