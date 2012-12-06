@@ -83,8 +83,12 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
 
         resize: () ->
             # Resize all graphs on window resize
+            owidth = @children(':first').width()
             for cell in @children()
                 @_resizeCell(ui.fromDom(cell))
+            nwidth = @children(':first').width()
+            if owidth != nwidth
+                @refresh()
 
 
         _resizeCell: (cell) ->
@@ -96,6 +100,7 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             cell.css
                 width: w
                 height: h
+                
 
 
     class Dashboard extends ui.Base
