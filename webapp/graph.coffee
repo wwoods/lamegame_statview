@@ -195,7 +195,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             for t of targetSet
                 targets.push(t)
             if targets.length == 0
-                console.log("Failed to get any targets")
+                self._loadingOverlay.text("Failed to find any source data")
+                self._display.empty()
+                return
 
             timeTo = self.config.timeBasis
             if timeTo == ''
