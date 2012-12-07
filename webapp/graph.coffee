@@ -131,8 +131,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 self._autoRefreshTimeout = null
 
             if self.config.expr == null or self.config.expr == ''
-                self._display.empty()
-                self._loadingOverlay.text('(No data selected)')
+                self._createTitle()
+                self._display.children().append(' (No data selected)')
                 return
 
             # Set up title and loading stuff
@@ -195,8 +195,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             for t of targetSet
                 targets.push(t)
             if targets.length == 0
-                self._loadingOverlay.text("Failed to find any source data")
                 self._display.empty()
+                self._createTitle()
+                self._display.children().append(' (Failed to find any source data)')
                 return
 
             timeTo = self.config.timeBasis
@@ -239,7 +240,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             loadedData = null
 
             error = () =>
-                self._loadingOverlay.text('(Failed to load)')
+                self._createTitle()
+                self._display.children().append(' (Failed to load)')
             gotNext = (data) =>
                 if not loadedData?
                     loadedData = data
@@ -510,6 +512,13 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             # Since the remaining points are considered "sane", we include a
             # lot more standard deviations
             return newAvg + stddev2 * 5
+            
+            
+        _createTitle: () ->
+            @_display.empty()
+            @_loadingOverlay.empty()
+            _title = $('<div class="graph-title"></div>').appendTo(
+                    @_display).text(@config.title)
         
         
         _drawAxis: (options) ->
@@ -1339,9 +1348,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             # ---- Draw the graph ----
             tickHeight = 20
             
-            # Render title
-            _title = $('<div class="graph-title"></div>').appendTo(
-                @_display).text(@config.title)
+            # Render title_title =
+            _title = self._createTitle()
             _title.bind 'click', () =>
                 cfg = $.extend({}, @config)
                 # Grab our time basis

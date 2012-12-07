@@ -30,6 +30,7 @@
 .graph-overlay {
     position: absolute;
     left: 1.5em;
+    right: 0;
     top: 0;
     color: #000;
     background-color: #fff;
@@ -45,7 +46,7 @@
     background-color: #eee;
 }
 .graph-loading-overlay {
-    display: inline-block;
+    display: block;
 }
 .graph-render-overlay {
     position: absolute;
