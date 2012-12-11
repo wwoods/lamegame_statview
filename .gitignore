@@ -5,3 +5,4 @@ app_local.ini
 
 # Shelve files are local storage for testing
 *.shelve
+*.shelve.db

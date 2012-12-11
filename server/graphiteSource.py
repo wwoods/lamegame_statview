@@ -38,12 +38,12 @@ class GraphiteSource(object):
         """
         urlBase = self._config['url']
         data = params
+        headers = { 'Accept-Encoding': 'gzip,deflate,sdch' }
         if data is not None:
             data = urllib.urlencode(data)
-        req = urllib2.Request(urlBase + url, data = data,
-                headers = { 'Authorization': self._config['authKey'],
-                        'Accept-Encoding': 'gzip,deflate,sdch', }
-                ) 
+        if self._config.get('authKey') is not None:
+            headers['Authorization'] = self._config['authKey']
+        req = urllib2.Request(urlBase + url, data = data, headers = headers)
         result = urllib2.urlopen(req)
         data = result.read()
         headers = result.headers
