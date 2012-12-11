@@ -73,3 +73,16 @@
     padding-top: 1px;
 }
 
+.graph-value-tooltip {
+	text-align: right;
+}
+
+.graph-value-tooltip-swatch {
+    /* The color swatch to the left of titles */
+    display: inline-block;
+    width: 0.9em;
+    height: 0.9em;
+    margin: 0.1em;
+    vertical-align: bottom;
+}
+

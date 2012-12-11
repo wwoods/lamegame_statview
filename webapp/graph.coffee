@@ -854,8 +854,10 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                             .y1((d) -> trendHeight)
                     )
                     .on("mousemove", (d) =>
-                        text = combined.title + ': '
-                        text += @_formatValue(@_eventInterp(d))
+                        tipDiv = $('<div class="graph-value-tooltip"></div>')
+                        tipDiv.append(combined.title + ': ')
+                        tipDiv.append(@_getTipSwatch(combined.title))
+                        tipDiv.append(@_formatValue(@_eventInterp(d)))
                         
                         # Compile a list of subgroups that affect this value,
                         # and sort their tooltips and append
@@ -867,13 +869,16 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                                 # Insignificant value
                                 continue
                             valStr = @_formatValue(r)
-                            tipLine = '<br/>' + ds.title + ': ' + valStr
-                            subtips.push([ tipLine, r ])
+                            valLine = $('<div></div>')
+                            valLine.append(ds.title + ': ')
+                            valLine.append(@_getTipSwatch(ds.title))
+                            valLine.append(valStr)
+                            subtips.push([ valLine, r ])
                             
                         subtips.sort (a,b) -> Math.abs(b[1]) - Math.abs(a[1])
                         for tip in subtips
-                            text += tip[0]
-                        ui.Tooltip.show(d3.event, text)
+                            tipDiv.append(tip[0])
+                        ui.Tooltip.show(d3.event, tipDiv)
                     )
                     .on("mouseout", () => ui.Tooltip.hide())
                     .on("click", () =>
@@ -970,7 +975,11 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                     .on("mousemove", (d) =>
                         val = @_eventInterp(d)
                         valStr = @_formatValue(val)
-                        ui.Tooltip.show(d3.event, d.title + ': ' + valStr)
+                        tip = $('<div class="graph-value-tooltip"></div>')
+                        tip.append(d.title + ': ')
+                        tip.append(@_getTipSwatch(d.title))
+                        tip.append(valStr)
+                        ui.Tooltip.show(d3.event, tip)
                     )
                     .on("mouseout", () => ui.Tooltip.hide())
                     .on("click", (d, di) =>
@@ -1085,7 +1094,11 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             mousemove = (d) ->
                 val = self._eventInterp(d)
                 valStr = self._formatValue(val)
-                ui.Tooltip.show(d3.event, d.title + ': ' + valStr)
+                tip = $('<div class="graph-value-tooltip"></div>')
+                tip.append(d.title + ': ')
+                        .append(self._getTipSwatch(d.title))
+                        .append(valStr)
+                ui.Tooltip.show(d3.event, tip)
                 # Make this line thicker
                 $(@).css("stroke-width", selWidth)
             mouseout = (d) ->
@@ -1208,6 +1221,15 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             g += (255 - g) * 0.3
             b += (255 - b) * 0.3
             return @_getColorHex(r, g, b)
+            
+            
+        _getTipSwatch: (name) ->
+            tipSwatch = $(
+                    '<div class="graph-value-tooltip-swatch">'
+                    + '</div>')
+                    .css('background-color', 
+                            graphColors(name))
+            return tipSwatch
             
             
         _hashString: (str) ->
