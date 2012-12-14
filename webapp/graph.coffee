@@ -300,10 +300,12 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             # First thing's first - if we're a total, we need to replace all
             # 'None' values with the last value.  If we're a count, just
             # replace all 'None' values with 0.
+            hasData = false
             if aggregateType == 'total'
                 lastValue = 0;
                 for i in [4...rawData.length]
                     if rawData[i] != 'None'
+                        hasData = true
                         lastValue = rawData[i]
                     else
                         rawData[i] = lastValue
@@ -311,8 +313,14 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 for i in [4...rawData.length]
                     if rawData[i] == 'None'
                         rawData[i] = 0
+                    else
+                        hasData = true
             else
                 throw "Invalid aggregateType: " + aggregateType
+
+            if not hasData
+                # This set doesn't have any data, so don't return it.
+                return null
 
             firstTime = timeFrom
             # Don't add any post-smoothing points before timeFrom, since for
@@ -1339,6 +1347,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 # across
                 dataSetData = self._aggregateSourceData(dataSet, pointTimes,
                         timeFrom, smoothAmt)
+                if not dataSetData
+                    continue
                 dataSetName = dataSetData.stat.name
                 myGroups = self.config.groups.slice()
                 dataOutput = data
