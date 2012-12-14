@@ -27,7 +27,13 @@ define ["cs!dataset"], (DataSet) ->
             pointTimes = @computeOptions.pointTimes
             expression = @computeOptions.expr
 
-            numPts = @values[stats[0].name][0].length
+            # All data sets at this point have the same length, so find the
+            # first valid one and 
+            numPts = 0
+            for statName, dataSets of @values
+                if dataSets.length > 0
+                    numPts = dataSets[0].length
+                    break
             
             exprVals = new DataSet(@, @title)
             expression.eval(exprVals, @values, 
