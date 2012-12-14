@@ -105,7 +105,7 @@ define [], () ->
             # if we allow them at the end, which may be confusing (and isn't
             # pretty; normally there will be a dash at the end because a group
             # is only part of the name).
-            statName = statName.replace(/-$/, '').replace(/^-/, '')
+            statName = statName.replace(/[\.-]+$/, '').replace(/^[\.-]+/, '')
 
             result.name = statName
             result.path = statPath
