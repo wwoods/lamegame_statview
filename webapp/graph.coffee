@@ -136,7 +136,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 return
 
             # Set up title and loading stuff
-            self._loadingOverlay.text('(Loading data, please wait)')
+            self._createTitle()
+            self._display.children().append(' (Loading data, please wait)')
 
             # Set new autorefresh
             if self.config.autoRefresh > 0
