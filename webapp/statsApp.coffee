@@ -48,6 +48,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             
             @append('&nbsp;&nbsp;&nbsp;&nbsp;')
             @sanitize = false
+            @utcDates = false
             @columns = 2
             @globalFilters = {}
             @globalFilters_doc = "Dict of filters: { group: [ values ] }"
@@ -58,7 +59,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                     new OptionsEditor(
                         filters: @globalFilters
                         statsController: @app._statsController
-                        sanitizeHolder: @
+                        optionsHolder: @
                         onChange: () => @refresh.trigger("click")
                     )
                 )
@@ -179,6 +180,8 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                 columns: @app.dashboard.container.columns
             if @sanitize
                 viewDef.sanitize = true
+            if @utcDates
+                viewDef.utcDates = true
             if not $.compareObjs({}, @globalFilters)
                 viewDef.filters = @globalFilters
             Hash.update(JSON.stringify(viewDef))
@@ -370,6 +373,10 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                         @header.sanitize = true
                     else
                         @header.sanitize = false
+                    if obj.utcDates
+                        @header.utcDates = true
+                    else
+                        @header.utcDates = false
                     if obj.columns
                         @header.columns = obj.columns
                     @header.picker.select(obj.view)

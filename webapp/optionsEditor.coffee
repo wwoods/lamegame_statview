@@ -54,11 +54,11 @@ define ["cs!lib/ui", "css!optionsEditor"], (ui) ->
             ### filters is a dict: { group: [ allowed values ] }
             ###
             @options = options
-            @sanitizeHolder = options.sanitizeHolder
+            @optionsHolder = options.optionsHolder
             @filters = options.filters
             @_initSettings = 
                 filters: $.extend(true, {}, @filters)
-                sanitize: @sanitizeHolder.sanitize
+                sanitize: @optionsHolder.sanitize
             @statsController = options.statsController
             
             body = $('<div class="options-editor"></div>')
@@ -76,7 +76,7 @@ define ["cs!lib/ui", "css!optionsEditor"], (ui) ->
             body.append('<div class="header">Misc Options</div>')
             sanDiv = $('<div></div>').appendTo(body)
             @sanitizer = $('<input type="checkbox" />').appendTo(sanDiv)
-            if @sanitizeHolder.sanitize
+            if @optionsHolder.sanitize
                 @sanitizer.attr('checked', true)
             sanTip = $("<span>Sanitize graphs</span>").appendTo(sanDiv)
             sanTip.add(@sanitizer)
@@ -89,6 +89,13 @@ define ["cs!lib/ui", "css!optionsEditor"], (ui) ->
                         the extreme point.  The tooltip will still show real
                         values."""))
                 .bind("mouseout", () -> ui.Tooltip.hide())
+
+            utcDiv = $('<div></div>').appendTo(body)
+            @utcDates = $('<input type="checkbox" />').appendTo(utcDiv)
+            if @optionsHolder.utcDates
+                @utcDates.attr('checked', true)
+            utcTip = $("<span>Show dates in UTC rather than local</span>")
+                    .appendTo(utcDiv)
             
             super(body: body)
             
@@ -96,11 +103,13 @@ define ["cs!lib/ui", "css!optionsEditor"], (ui) ->
         remove: () ->
             ### Save our filters
             ###
-            @sanitizeHolder.sanitize = @sanitizer.is(':checked')
+            @optionsHolder.sanitize = @sanitizer.is(':checked')
+            @optionsHolder.utcDates = @utcDates.is(':checked')
             @_refreshFilters()
             newSettings =
                 filters: @filters
-                sanitize: @sanitizeHolder.sanitize
+                sanitize: @optionsHolder.sanitize
+                utcDates: @optionsHolder.utcDates
             if not $.compareObjs(newSettings, @_initSettings)
                 if @options.onChange?
                     @options.onChange()

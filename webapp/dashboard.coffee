@@ -162,6 +162,10 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             return 'now'
 
 
+        getUtcDates: () ->
+            return ui.fromDom('.stats-header').utcDates
+
+
         refresh: () ->
             @container.refresh()
             

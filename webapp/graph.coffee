@@ -220,6 +220,11 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             @_sanitize = false
             if @dashboard.getSanitize()
                 @_sanitize = true
+
+            # Use UTC dates?
+            @_utcDates = false
+            if @dashboard.getUtcDates()
+                @_utcDates = true
                 
             requestBase =
                 timeFrom: Math.floor(timeFrom - 
@@ -575,6 +580,18 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 else
                     break
 
+            getSeconds = Date.prototype.getSeconds
+            getMinutes = Date.prototype.getMinutes
+            getHours = Date.prototype.getHours
+            getDate = Date.prototype.getDate
+            getMonth = Date.prototype.getMonth
+            if @_utcDates
+                getSeconds = Date.prototype.getUTCSeconds
+                getMinutes = Date.prototype.getUTCMinutes
+                getHours = Date.prototype.getUTCHours
+                getDate = Date.prototype.getUTCDate
+                getMonth = Date.prototype.getUTCMonth
+
             # Now that we have "optimal" length, align to nearest whole time 
             # unit
             intervalShift = 0
@@ -586,14 +603,14 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             timeToReset = [
                 # Array of lambdas based off of maxDate to get the number of
                 # seconds to take off to reach the next "round" tick
-                () -> maxDate.getSeconds()
-                () -> (maxDate.getMinutes() % 5) * 60
-                () -> (maxDate.getMinutes() % 20) * 60
-                () -> (maxDate.getMinutes() % 30) * 60
-                () -> maxDate.getMinutes() * 60
-                () -> (maxDate.getHours() % 2) * 60*60
-                () -> (maxDate.getHours() % 6) * 60*60
-                () -> maxDate.getHours() * 60*60
+                () -> getSeconds.call(maxDate)
+                () -> (getMinutes.call(maxDate) % 5) * 60
+                () -> (getMinutes.call(maxDate) % 20) * 60
+                () -> (getMinutes.call(maxDate) % 30) * 60
+                () -> getMinutes.call(maxDate) * 60
+                () -> (getHours.call(maxDate) % 2) * 60*60
+                () -> (getHours.call(maxDate) % 6) * 60*60
+                () -> getHours.call(maxDate) * 60*60
             ]
 
             for nextResetFn in timeToReset
@@ -619,12 +636,13 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 
                 # This fixes daylight savings, but also is kind of nice if an
                 # exact day should happen to fall between two intervals
-                leftInDay = d.getHours() * 60 * 60 + d.getMinutes() * 60
+                leftInDay = (getHours.call(d) * 60 * 60 +
+                        getMinutes.call(d) * 60)
                 if intervalLength > leftInDay
                 	intervalMax -= leftInDay
                 	d.setTime(intervalMax * 1000)
 
-                if d.getHours() == 0 and d.getMinutes() == 0
+                if getHours.call(d) == 0 and getMinutes.call(d) == 0
                     # Month : day timestamps
                     months =
                         0: 'Jan'
@@ -639,14 +657,15 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                         9: 'Oct'
                         10: 'Nov'
                         11: 'Dec'
-                    label = months[d.getMonth()] + d.getDate().toString()
+                    label = (months[getMonth.call(d)] +
+                            getDate.call(d).toString())
                 else
                     # Hour : Minute timestamps
-                    hrs = d.getHours().toString()
+                    hrs = getHours.call(d).toString()
                     if d.getMinutes() == 0
                         mins = 'h'
                     else
-                        mins = d.getMinutes().toString()
+                        mins = getMinutes.call(d).toString()
                         if mins.length < 2
                             mins = '0' + mins
                         mins = ':' + mins
