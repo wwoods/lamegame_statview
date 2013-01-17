@@ -136,13 +136,17 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 return
 
             # Set up title and loading stuff
-            self._createTitle()
-            self._display.children().append(' (Loading data, please wait)')
+            self._createTitle(true)
+            self._display.children(':first').append(
+                    ' (Loading data, please wait)')
 
-            # Set new autorefresh
-            if self.config.autoRefresh > 0
+            # Set up next autorefresh
+            autoRefresh = self.config.autoRefresh
+            if autoRefresh == ''
+                autoRefresh = @dashboard.getAutoRefresh()
+            if autoRefresh > 0
                 self._autoRefreshNext = (new Date().getTime() / 1000)
-                self._autoRefreshNext += self.config.autoRefresh
+                self._autoRefreshNext += autoRefresh
             else
                 self._autoRefreshNext = null
 
@@ -205,7 +209,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             if timeTo == ''
                 timeTo = @dashboard.getTimeBasis()
             if timeTo == 'now'
-                timeTo = (new Date().getTime() / 1000)
+                if not @dashboard.start?
+                    @dashboard.start = new Date().getTime() / 1000
+                timeTo = (new Date().getTime() / 1000) - 180*(new Date().getTime() / 1000 - @dashboard.start)
 
             timeAmt = self.config.timeAmt
             if timeAmt == ''
@@ -302,6 +308,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             aggregateType = 'count'
             if stat.type == 'total' or stat.type == 'total-max'
                 aggregateType = 'total'
+            else if stat.type == 'count-fuzzy'
+                aggregateType = 'count-fuzzy'
             
             # First thing's first - if we're a total, we need to replace all
             # 'None' values with the last value.  If we're a count, just
@@ -315,7 +323,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                         lastValue = rawData[i]
                     else
                         rawData[i] = lastValue
-            else if aggregateType == 'count'
+            else if aggregateType == 'count' or aggregateType == 'count-fuzzy'
                 for i in [4...rawData.length]
                     if rawData[i] == 'None'
                         rawData[i] = 0
@@ -352,6 +360,67 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 # If smoothing was too small for between points, use point density
                 smoothSecs = pointTimes[1] - pointTimes[0]
             #console.log("Final smooth: " + smoothSecs)
+
+            if aggregateType == 'count-fuzzy'
+                # Aggregate via bubbling... each pointTime is affected by the
+                # buckets around it according to their distance from the
+                # affected point.
+                # Note - this method MUST maintain maximum values (e.g. the
+                # graph maximum for a single point is the point's value).
+                # A good name for this might be "fuzzy counter", since it is
+                # essentially a stat with some stochastic occurrance.
+                for pt in pointTimes
+                    values.push(0)
+
+                lastPoint = pointTimes[pointTimes.length - 1]
+                firstPoint = pointTimes[0]
+
+                # I've tried to square or cube the falloff, but linear just
+                # works out the best, partly because a smoothSecs equaling the
+                # period of a uniformly distributed event then looks completely
+                # even.
+                falloff = 1
+                for index in [srcIndex...rawData.length]
+                    v = parseFloat(rawData[index])
+                    vt = srcTime
+
+                    for pointTime, i in pointTimes
+                        dist = Math.abs(pointTime - vt)
+                        if dist < smoothSecs
+                            magnitude = Math.pow(
+                                    1.0 - Math.abs(dist / smoothSecs), falloff)
+
+                            # Would our mirror around point time be off either
+                            # side of the graph?  Granted this is a little
+                            # "predictive", but it preserves the curvature
+                            # around points given the lack of data
+                            edgeDist = vt + smoothSecs - lastPoint
+                            if edgeDist > 0 and lastPoint - edgeDist < pointTime
+                                # So, we want to integrate the region that
+                                # we're missing (edgeDist) into the region
+                                # between the end of our data set and
+                                # edgeDist before the end of our data set.
+                                # Essentially, mirroring in the missing area.
+                                pointMag = 1.0 - (lastPoint - pointTime) /
+                                        edgeDist
+                                if pointMag > 0
+                                    pointMag *= edgeDist / smoothSecs
+                                    pointMag = Math.pow(pointMag, falloff)
+                                    magnitude += pointMag
+
+                            values[i] += v * magnitude
+
+                            # Note, we don't apply edge wrapping to the past
+                            # side of the graph, since we already request
+                            # smoothSecs of extra historical data.  In other
+                            # words, this side is already an accurate graph
+
+                    # Next point happens in the future...
+                    srcTime += srcInterval
+
+                # And done
+                return result
+
 
             movingTotal = 0.0
             movingIndex = srcIndex
@@ -528,11 +597,18 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             return newAvg + stddev2 * 5
             
             
-        _createTitle: () ->
-            @_display.empty()
-            @_loadingOverlay.empty()
-            _title = $('<div class="graph-title"></div>').appendTo(
-                    @_display).text(@config.title)
+        _createTitle: (keepDisplay) ->
+            titleHtml = '<div class="graph-title"></div>'
+            if not keepDisplay
+                @_display.empty()
+                @_loadingOverlay.empty()
+                title = $(titleHtml).appendTo(@_display)
+            else
+                @_loadingOverlay.empty()
+                title = @_display.children(':first')
+                if title.length == 0
+                    title = $(titleHtml).appendTo(@_display)
+            title.text(@config.title)
         
         
         _drawAxis: (options) ->
@@ -809,6 +885,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 else if zoomType == 'linear'
                     @_drawGraph_zoom_layer_linear(options, detailVis,
                             subgroupSets)
+                else if zoomType == 'area-period'
+                    @_drawGraph_zoom_layer_area_period(options, detailVis,
+                            subgroupSets)
                 else
                     throw "Invalid render zoom type - " + zoomType
                     
@@ -1048,6 +1127,151 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                     )
                     
                     
+        _drawGraph_zoom_layer_area_period: (options, detailVis, subgroupSets) ->
+            # Remap points to [0..1] based on portion
+            # of _the absolute value_ of combined subgroups, but with respect
+            # to each element's personal greatest.
+
+            # That is, for each point in time for each subgroup, map from [0, 1]
+            # according to the absolute value's proportion of the maximum
+            # absolute value for that subgroup.  Then, for each point in time,
+            # display EITHER a 100% stacked or a normal stack of those
+            # proportions
+
+            # De-compress options
+            {layers, display, height, zoomType} = options
+            width = $(detailVis[0]).width()
+            height = $(detailVis[0]).height()
+            xmin = subgroupSets[0][0].x
+            xmax = subgroupSets[0][subgroupSets[0].length - 1].x
+
+            # Find the max per subgroup
+            subgroupMax = []
+            for ds in subgroupSets
+                max = 0
+                for i in [0...ds.length]
+                    max = Math.max(Math.abs(ds[i].y), max)
+                # No data points?  Use 1 to avoid division errors
+                if max == 0
+                    max = 1
+                subgroupMax.push(max)
+
+            # No label for y-max on area slices... the fact that it's fully
+            # colored makes it hard to see, and it's the same max as the
+            # bottom division at any rate
+            #$('<div class="graph-display-label-max"></div>')
+            #    .text(@_formatValue(absCombinedMax))
+            #    .insertBefore(detailVis[0])
+
+            # Normalize each subgroup's data to [0..1]
+            scalar = (v) -> v
+            scalar = (v) -> Math.log(v + 1)
+            absoluteMax = 0
+            for i in [0...subgroupSets[0].length]
+                spotMax = 0
+                for ds, j in subgroupSets
+                    ds[i].ynormAlone = Math.abs(ds[i].y) / subgroupMax[j]
+                    spotMax = Math.max(scalar(ds[i].ynormAlone), spotMax)
+                absoluteMax = Math.max(spotMax, absoluteMax)
+
+            # Normalize all data points according to the absolute max
+            if absoluteMax == 0
+                absoluteMax = 1
+
+            for ds in subgroupSets
+                for i in [0...ds.length]
+                    ds[i].ynorm = (ds[i].ynormAlone *
+                            scalar(ds[i].ynormAlone) / absoluteMax)
+
+            # d3.layout.stack() adds the "y0" property to dataSets, and
+            # stacks them
+            stacksGen = d3.layout.stack().offset('zero')
+                .y((d) -> d.ynorm)
+                .out (d, y0, y) ->
+                    d.y0 = y0
+
+            # We offer click-to-level functionality, since it can be hard
+            # to tell the trend of any individual element if it doesn't
+            # have an edge that's a horizontal line
+            detailStackOrder = layers[layers.length - 1][1]
+            if detailStackOrder?
+                stackOrder = detailStackOrder
+            else
+                stackOrder = [0...subgroupSets.length]
+
+            restackData = () =>
+                # Run the d3.layout.stack on a sorted version of our
+                # subgroupSets; it's nice to keep the order that
+                # we pass them to the visualization the same so
+                # that the same colors represent the same objects
+                toStack = []
+                for i in stackOrder
+                    toStack.push(subgroupSets[i])
+                return stacksGen(toStack)
+
+            # Perform first stack
+            restackData()
+
+            # Draw the proportional bit
+            self = @
+            area = d3.svg.area()
+            area
+                .x((d) -> (d.x - xmin) * width / (xmax - xmin))
+                .y0((d) -> height - 0*d.y0 * height)
+                .y1((d) -> height - (d.ynorm + 0*d.y0) * height)
+            detailVis.selectAll("path")
+                .data(subgroupSets).enter()
+                    .append("path")
+                    .style("fill", (d) -> graphColors(d.title))
+                    .attr("d", area)
+                    .on("mousemove", (d) =>
+                        val = @_eventInterp(d)
+                        valStr = @_formatValue(val)
+                        tip = $('<div class="graph-value-tooltip"></div>')
+                        tip.append(d.title + ': ')
+                        tip.append(@_getTipSwatch(d.title))
+                        tip.append(valStr)
+                        ui.Tooltip.show(d3.event, tip)
+                    )
+                    .on("mouseout", () => ui.Tooltip.hide())
+                    .on("click", (d, di) =>
+                        if window.debug
+                            console.log(arguments)
+                            console.log(stackOrder)
+
+                        if di == stackOrder[0]
+                            # Already at the bottom, zoom in
+                            # Write out our current stackOrder to our
+                            # layer so that when it's restored, it will be
+                            # sorted like it was before
+                            layers[layers.length - 1][1] = stackOrder
+
+                            # Push a new layer and re-render
+                            layers.push([ d.group, null ])
+                            @_drawGraph_zoom_layer(options)
+                            return
+
+                        # Remove current stackOrder == di and put it at 0
+                        # Swap current 0 with stackOrder == di
+                        diPos = -1
+                        for q, j in stackOrder
+                            if q == di
+                                diPos = j
+                                break
+
+                        stackOrder = stackOrder[...diPos].concat(
+                            stackOrder[diPos + 1..])
+                        stackOrder.unshift(di)
+
+                        restackData()
+                        detailVis.selectAll("path")
+                            .data(subgroupSets)
+                            .transition()
+                                .duration(1000)
+                                .attr("d", area)
+                    )
+
+
         _drawGraph_zoom_layer_linear: (options, detailVis, subgroupSets) ->
             # Render absolute values as lines of the composite combined value,
             # according to their magnitude
@@ -1428,8 +1652,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 @_display
                 height
             ]
-            if @config.type == 'area'
-                @_drawGraph_area.apply(@, drawGraphArgs)
+            if @config.type == 'area-period'
+                drawGraphArgs.push('area-period')
+                @_drawGraph_zoom.apply(@, drawGraphArgs)
             else if @config.type == 'area-zoom'
                 drawGraphArgs.push('area')
                 @_drawGraph_zoom.apply(@, drawGraphArgs)

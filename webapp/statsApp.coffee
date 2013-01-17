@@ -24,7 +24,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             @deleter.bind("click", () => @deleteDash())
 
             @refresh = $('<input type="submit" value="Refresh" />').appendTo(@)
-            @refresh.bind("click", () => 
+            @refresh.bind("click", () =>
                     @_hashUpdate()
                     @app.dashboard.refresh()
             )

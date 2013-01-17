@@ -133,6 +133,10 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             return ui.fromDom('.stats-header').globalFilters
 
 
+        getAutoRefresh: () ->
+            return 300
+
+
         getDefinition: () ->
             # Get the definition of this dashboard to save out
             result =
