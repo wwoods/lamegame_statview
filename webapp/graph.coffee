@@ -209,9 +209,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             if timeTo == ''
                 timeTo = @dashboard.getTimeBasis()
             if timeTo == 'now'
-                if not @dashboard.start?
-                    @dashboard.start = new Date().getTime() / 1000
-                timeTo = (new Date().getTime() / 1000) - 180*(new Date().getTime() / 1000 - @dashboard.start)
+                timeTo = new Date().getTime() / 1000
 
             timeAmt = self.config.timeAmt
             if timeAmt == ''
