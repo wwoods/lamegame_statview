@@ -39,9 +39,12 @@ define [], (Stat) ->
             if match
                 result = {}
                 for group, i in @groups
-                    # Just like in statPath, every other group is our actual
-                    # group
-                    result[group] = match[2*(i + 1)]
+                    # Chrome (at least) memory management uses a complicated
+                    # set of operations to not duplicate memory for substring
+                    # operations.  However, we truly want to copy the string
+                    # so that we don't keep the massive data string around.
+                    # So, copy it via a hack.
+                    result[group] = match[2*(i + 1)].replace(/./, "$&")
             return result
 
     
