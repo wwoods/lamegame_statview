@@ -14,6 +14,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             self = this
             self._statsController = ui.Base.fromDom('.stats-app')._statsController
 
+            @_renderedEventsToClean = []
             self._display = $('<div class="graph-display"></div>').appendTo(
                     self)
 
@@ -818,6 +819,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                     )
                     .on("mouseout", () -> ui.Tooltip.hide())
 
+            # Circular reference cleanup
+            @_registerRenderedEvents(vis, [ "mousemove", "mouseout" ])
+
 
         _drawGraph_zoom: (data, display, height, zoomType) ->
             ### Draw an area_zoom graph of data in display with height.
@@ -991,6 +995,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                             layers.pop()
                             @_drawGraph_zoom_layer(options)
                     )
+
+            # Circular reference cleanup
+            @_registerRenderedEvents(visn, [ "mousemove", "mouseout", "click" ])
                     
                     
         _drawGraph_zoom_layer_area: (options, detailVis, subgroupSets) ->
@@ -1123,6 +1130,10 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                                 .duration(1000)
                                 .attr("d", area)
                     )
+
+            # Circular reference cleanup
+            @_registerRenderedEvents(detailVis, [ "mousemove", "mouseout",
+                    "click" ])
                     
                     
         _drawGraph_zoom_layer_area_period: (options, detailVis, subgroupSets) ->
@@ -1269,6 +1280,10 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                                 .attr("d", area)
                     )
 
+            # Circular reference cleanup
+            @_registerRenderedEvents(detailVis, [ "mousemove", "mouseout",
+                    "click" ])
+
 
         _drawGraph_zoom_layer_linear: (options, detailVis, subgroupSets) ->
             # Render absolute values as lines of the composite combined value,
@@ -1394,6 +1409,10 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 .on("mouseout", mouseout)
                 .on("click", click)
 
+            # Circular reference cleanup
+            @_registerRenderedEvents(detailVis, [ "mousemove", "mouseout",
+                    "click" ])
+
 
         _eventInterp: (dataSet) ->
             ### Use d3.event to interpolate our position in the dataSet, and
@@ -1517,6 +1536,18 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             # timeTo is passed since it might be defined according to the 
             # request (timeFrom as well).  stats passed to avoid re-parsing.
             {stats, smoothAmt} = options
+
+            # Unbind d3 event listeners to prevent leaks...  Do this in a
+            # closure so that we forget entirely about last round's events
+            # to clean.
+            (() =>
+                eventsToClean = @_renderedEventsToClean
+                @_renderedEventsToClean = []
+                for holder in eventsToClean
+                    [element, events] = holder
+                    for ev in events
+                        element.on(ev, null)
+            )()
             
             self = this
             self._display.empty()
@@ -1664,6 +1695,14 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
 
             # Remove loaded message
             loadedText.remove()
+
+
+        _registerRenderedEvents: (element, events) ->
+            ### Register some .on() events on element or its descendants.
+            They will be unregistered so that the garbage collector may clean
+            up on the next render.
+            ###
+            @_renderedEventsToClean.push([ element.selectAll("path"), events ]);
 
     return Graph
 
