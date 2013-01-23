@@ -259,7 +259,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 else
                     loadedData += '\n' + data
                 makeNext()
-            makeNext = =>
+            makeNext = () =>
                 if requests.length == 0
                     self._onLoaded(loadedData, timeFrom, timeTo, 
                             stats: stats, smoothAmt: smoothAmt)
@@ -1564,12 +1564,12 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             if self._autoRefreshNext != null
                 timeToGo = self._autoRefreshNext - (new Date().getTime() / 1000)
                 if timeToGo < 0
-                    self.update()
-                else
-                    self._autoRefreshTimeout = setTimeout(
-                        () -> self.update()
-                        timeToGo * 1000
-                    )
+                    timeToGo = 0
+
+                self._autoRefreshTimeout = setTimeout(
+                    () -> self.update()
+                    timeToGo * 1000
+                )
 
             # Step 1 - Parse the data returned to us into datasets
             dataSetsIn = dataRaw.split(/\n/g)
@@ -1702,7 +1702,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             They will be unregistered so that the garbage collector may clean
             up on the next render.
             ###
-            @_renderedEventsToClean.push([ element.selectAll("path"), events ]);
+            @_renderedEventsToClean.push([ element.selectAll("path"), events ])
 
     return Graph
 
