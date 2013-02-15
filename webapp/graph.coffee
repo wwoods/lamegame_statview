@@ -116,7 +116,21 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             return statsFound
 
 
+        remove: () ->
+            ### Remove this graph and clean up all of its dependency cycles.
+            ###
+            super
+            @_renderedEventsCleanup()
+            @_controls.remove()
+            @_controls = null
+
+
         update: (configChanges) ->
+            # Are we no longer in DOM?  break the cycle.
+            if @parents('body').length == 0
+                @remove()
+                return
+
             self = this
             if configChanges
                 for q of configChanges
@@ -1540,14 +1554,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             # Unbind d3 event listeners to prevent leaks...  Do this in a
             # closure so that we forget entirely about last round's events
             # to clean.
-            (() =>
-                eventsToClean = @_renderedEventsToClean
-                @_renderedEventsToClean = []
-                for holder in eventsToClean
-                    [element, events] = holder
-                    for ev in events
-                        element.on(ev, null)
-            )()
+            @_renderedEventsCleanup()
             
             self = this
             self._display.empty()
@@ -1703,6 +1710,16 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             up on the next render.
             ###
             @_renderedEventsToClean.push([ element.selectAll("path"), events ])
+
+
+        _renderedEventsCleanup: () ->
+            eventsToClean = @_renderedEventsToClean
+            @_renderedEventsToClean = []
+            for holder in eventsToClean
+                [element, events] = holder
+                for ev in events
+                    element.on(ev, null)
+
 
     return Graph
 
