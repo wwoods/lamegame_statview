@@ -42,6 +42,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 $.extend(self.config, config)
             self._autoRefreshTimeout = null
             self._authRefreshNext = null
+            self._blockAutoRefresh = false
 
             expanded = not config?
             self._controls = new Controls(self, expanded).appendTo(self)
@@ -144,6 +145,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             if self._autoRefreshTimeout != null
                 clearTimeout(self._autoRefreshTimeout)
                 self._autoRefreshTimeout = null
+
+            # Re-allow autorefresh if it's blocked, since we're updating.
+            self._blockAutoRefresh = false
 
             if self.config.expr == null or self.config.expr == ''
                 self._createTitle()
@@ -555,6 +559,17 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
 
             # Done!
             return result
+
+
+        _autoRefresh: () ->
+            ###Refresh!
+            ###
+            if @_blockAutoRefresh
+                @_autoRefreshTimeout = setTimeout(
+                        () => @_autoRefresh(),
+                        1000)
+            else
+                @update()
             
             
         _calculateSanitize: (valSets) ->
@@ -859,6 +874,12 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             
             # De-compress options
             {layers, display, height, zoomType} = options
+
+            if layers.length > 1
+                # Don't interrupt work with an auto refresh!
+                @_blockAutoRefresh = true
+            else
+                @_blockAutoRefresh = false
             
             @__zoomContainer.remove()
             @__zoomContainer = $('<div></div>').appendTo(display)
@@ -1550,13 +1571,24 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             # timeTo is passed since it might be defined according to the 
             # request (timeFrom as well).  stats passed to avoid re-parsing.
             {stats, smoothAmt} = options
+            self = this
+
+            if @_blockAutoRefresh
+                # We probably don't actually want to commit the data...
+                @_createTitle(true)
+                @_display.children(':first').append(
+                        ' (New data loaded, waiting)')
+                origArgs = arguments
+                setTimeout(
+                        () => @_onLoaded.apply(@, origArgs)
+                        1000)
+                return
 
             # Unbind d3 event listeners to prevent leaks...  Do this in a
             # closure so that we forget entirely about last round's events
             # to clean.
             @_renderedEventsCleanup()
             
-            self = this
             self._display.empty()
             self._loadingOverlay.empty()
 
@@ -1574,7 +1606,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                     timeToGo = 0
 
                 self._autoRefreshTimeout = setTimeout(
-                    () -> self.update()
+                    () -> self._autoRefresh()
                     timeToGo * 1000
                 )
 
