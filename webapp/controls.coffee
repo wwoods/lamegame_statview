@@ -27,11 +27,6 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
                 )
             )
 
-            timeDiv = $('<div>Show last </div>')
-            @timeDivAmt = $('<input type="text" />').appendTo(timeDiv)
-            # COMMENTED!  Dashboard has an overall time, no need for this
-            #@_content.append(timeDiv)
-
             @_content.append("Title: ")
             @title = $('<input type="text" />').appendTo(@_content)
             @title.css
@@ -101,6 +96,11 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
             smootherDiv = $("<div></div>").appendTo(@_content)
             smootherDiv.append "Smooth hours: "
             @smoother = $("<input type=\"text\" />").appendTo(smootherDiv)
+
+            timeDiv = $('<div>Show last </div>')
+            @timeDivAmt = $('<input type="text" />').appendTo(timeDiv)
+            @_content.append(timeDiv)
+
             ok = new ui.Base("<input type=\"button\" value=\"Refresh\" />")
             @_content.append ok
 
