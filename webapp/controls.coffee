@@ -28,7 +28,7 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
             )
 
             timeDiv = $('<div>Show last </div>')
-            timeDivAmt = $('<input type="text" />').appendTo(timeDiv)
+            @timeDivAmt = $('<input type="text" />').appendTo(timeDiv)
             # COMMENTED!  Dashboard has an overall time, no need for this
             #@_content.append(timeDiv)
 
@@ -38,7 +38,23 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
                 width: '200px'
             @title.val('(unnamed)')
 
-            @_content.append('<br />')
+            utilPane = $('<div class="controls-util"></div>')
+            $('<input type="submit" value="Copy" />')
+                .bind("click", () => window.prompt(
+                        "Copy following definition: ",
+                        JSON.stringify(@getOptions())))
+                .appendTo(utilPane)
+            $('<input type="submit" value="Restore from clipboard" />')
+                .bind("click", () =>
+                    def = window.prompt("Paste here: ")
+                    $.extend(@_graph.config, JSON.parse(def))
+                    @_updateFieldsFromGraph()
+                    @refresh()
+                )
+                .appendTo(utilPane)
+            @_content.append(utilPane)
+
+            @_content.append('<br style="clear:both;"/>')
 
             @type = new ui.ListBox()
             @type.addOption "area-zoom", "Area Zoom"
@@ -84,7 +100,7 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
 
             smootherDiv = $("<div></div>").appendTo(@_content)
             smootherDiv.append "Smooth hours: "
-            smoother = $("<input type=\"text\" />").appendTo(smootherDiv)
+            @smoother = $("<input type=\"text\" />").appendTo(smootherDiv)
             ok = new ui.Base("<input type=\"button\" value=\"Refresh\" />")
             @_content.append ok
 
@@ -106,44 +122,44 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
             deleter.bind "click", () =>
                 @uiClosest('.dashboard-cell').remove()
 
-            # Populate initial fields from graph
-            options = @_graph.config
-            @type.select(options.type)
-            @title.val(options.title)
-            @expr.val(options.expr)
-            smoother.val(options.smoothOver)
-            timeDivAmt.val(options.timeAmt)
+            # Populate fields from graph
+            @_updateFieldsFromGraph()
             # Wait to trigger expr change and update groups available until
             # we're in the dom and visible (in @_expandCollapseButton)
 
             # Bind refresh button
             ok.bind 'click', () =>
-                stat = @_statsController.stats[@statsLb.val()]
-                groups = []
-                @groupsActive.children().each ->
-                    filter = $(".regex", $(this)).val()
-                    groups.push [$(this).text(), filter]
-
-                options =
-                    title: @title.val()
-                    type: @type.val()
-                    stats: @_statsFound
-                    expr: @expr.val()
-                    groups: groups
-                    smoothOver: smoother.val()
-                    timeAmt: timeDivAmt.val()
-                    autoRefresh: ''
-
-                @_graph.update options
+                @_graph.update @getOptions()
 
             @_content.hide()
             if autoExpand
                 @_expandCollapse.trigger("click")
+
+
+        getOptions: () ->
+            # Returns the options specified; that is, the complete graph
+            # specification
+            stat = @_statsController.stats[@statsLb.val()]
+            groups = []
+            @groupsActive.children().each ->
+                filter = $(".regex", $(this)).val()
+                groups.push [$(this).text(), filter]
+
+            options =
+                title: @title.val()
+                type: @type.val()
+                stats: @_statsFound
+                expr: @expr.val()
+                groups: groups
+                smoothOver: @smoother.val()
+                timeAmt: @timeDivAmt.val()
+                autoRefresh: ''
+            return options
                 
                 
         refresh: () ->
             # Called when shown, refresh since stat configuration may
-            # have changed.
+            # have changed, meaning the user has different options available.
             @statsLb.reset()
             for name of @_statsController.stats
                 @statsLb.addOption name
@@ -180,4 +196,13 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
             $("<input class=\"regex\" type=\"text\" />").bind("click", ->
                 false
             ).appendTo(g).val(filter)
+
+
+        _updateFieldsFromGraph: () ->
+            options = @_graph.config
+            @type.select(options.type)
+            @title.val(options.title)
+            @expr.val(options.expr)
+            @smoother.val(options.smoothOver)
+            @timeDivAmt.val(options.timeAmt)
 

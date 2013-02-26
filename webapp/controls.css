@@ -3,6 +3,7 @@
     left: 0;
     top: 0;
 }
+
 .controls-collapse {
     width: 1.5em;
     height: 0.9em;
@@ -11,11 +12,16 @@
     font-size: 0.8em;
     cursor: pointer;
 }
+
 .controls-content {
     position: relative;
     display: inline-block;
     background-color: #f4f4f4;
     border: solid 1px #000;
     padding: 2px;
+}
+
+.controls-util {
+    float: right;
 }
 
