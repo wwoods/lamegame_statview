@@ -80,6 +80,12 @@ define [ 'cs!statPath', 'cs!stat' ], (StatPath, Stat) ->
                 @groups[g].sort()
 
 
+        setAliases: (aliases) ->
+            @aliases = {}
+            for def in aliases
+                @aliases[def.id] = def.aliases
+
+
         _addPath: (pathOptions) ->
             if typeof pathOptions == 'string'
                 statPath = new StatPath(path: pathOptions)

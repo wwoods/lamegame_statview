@@ -313,6 +313,11 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 if match != null
                     matchStat = stat
                     matchGroups = match
+                    # Convert aliased values
+                    for group, val of matchGroups
+                        groupAliases = self._statsController.aliases[group]
+                        if groupAliases and val of groupAliases
+                            matchGroups[group] = groupAliases[val]
                     break
 
             if matchStat == null

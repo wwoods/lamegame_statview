@@ -42,3 +42,7 @@ body {
 	float: right;
 }
 
+.stats-header-aliases-button {
+    padding: 0.25em;
+    float: right;
+}

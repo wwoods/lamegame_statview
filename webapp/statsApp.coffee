@@ -1,7 +1,7 @@
 reqs = [ "cs!lib/ui", "cs!statsController", "cs!dashboard", "cs!statPathEditor", 
-        "cs!optionsEditor", "js-hash/Hash", "css!statsApp" ]
+        "cs!optionsEditor", "js-hash/Hash", "css!statsApp", "cs!aliasEditor" ]
 callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor, 
-        Hash) ->
+        Hash, __css__, AliasEditor) ->
     class StatsHeader extends ui.Base
         constructor: (app, dashboards) ->
             super('<div class="stats-header"></div>')
@@ -103,6 +103,14 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                 ).appendTo(@)
                 .bind("click", () =>
                     @app.editPaths()
+                )
+
+            @groupNamer = new ui.Base(
+                    '<input type="submit" value="Aliases"
+                        class="stats-header-aliases-button" />'
+                ).appendTo(@)
+                .bind("click", () =>
+                    @app.editAliases()
                 )
 
 
@@ -290,7 +298,9 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
 
                         @_statsController = new StatsController(data.stats)
                         @_paths = data.paths
+                        @_aliases = data.aliases
                         @_statsController.parseStats(@_paths)
+                        @_statsController.setAliases(@_aliases)
                         console.log(@_statsController)
                         window.sc = @_statsController
 
@@ -318,6 +328,18 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             @dashboard = new Dashboard(definition, cols).appendTo(@)
             # Avoid initial set of loads
             @dashboard.bind('needs-save', () => @header.needsSave())
+
+
+        editAliases: () ->
+            ### Edit the @aliases dict
+            ###
+            new AliasEditor
+                app: @
+                controller: @_statsController
+                aliases: @_aliases
+                onChange: () =>
+                    @_statsController.setAliases(@_aliases)
+
             
             
         editPaths: () ->

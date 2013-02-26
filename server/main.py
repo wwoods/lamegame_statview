@@ -46,33 +46,24 @@ class MainRoot(object):
             raise ValueError("Unknown source type " + t)
 
         # Do we have storage?
-        if cherrypy.app.get('storage', {}).get('dashboards') is not None:
-            url = cherrypy.app['storage']['dashboards']
-            if url.startswith('pymongo://'):
-                # Do the import here so pymongo isn't required in places
-                # that are not using it
-                from server.storage.mongoStore import MongoCollection
-                self._dashStorage = MongoCollection(url)
-            elif url.startswith('shelve://'):
-                from server.storage.shelveStore import ShelveCollection
-                self._dashStorage = ShelveCollection(url)
-            else:
-                raise ValueError("Unknown 'dashboards' URL: " + url)
-        else:
-            self._dashStorage = None
+        for storeType, varShorthand in [ ('dashboards', 'dash'),
+                ('paths', 'path'), ('aliases', 'alias') ]:
+            store = None
+            if cherrypy.app.get('storage', {}).get(storeType) is not None:
+                url = cherrypy.app['storage'][storeType]
+                if url.startswith('pymongo://'):
+                    # Do the import here so pymongo isn't required in places
+                    # that are not using it
+                    from server.storage.mongoStore import MongoCollection
+                    store = MongoCollection(url)
+                elif url.startswith('shelve://'):
+                    from server.storage.shelveStore import ShelveCollection
+                    store = ShelveCollection(url)
+                else:
+                    raise ValueError("Unknown 'dashboards' URL: " + url)
 
-        if cherrypy.app.get('storage', {}).get('paths') is not None:
-            url = cherrypy.app['storage']['paths']
-            if url.startswith('pymongo://'):
-                from server.storage.mongoStore import MongoCollection
-                self._pathStorage = MongoCollection(url)
-            elif url.startswith('shelve://'):
-                from server.storage.shelveStore import ShelveCollection
-                self._pathStorage = ShelveCollection(url)
-            else:
-                raise ValueError("Unknown 'paths' URL: " + url)
-        else:
-            self._pathStorage = None
+            varName = '_{0}Storage'.format(varShorthand)
+            setattr(self, varName, store)
 
 
     @cherrypy.expose
@@ -123,11 +114,27 @@ class MainRoot(object):
         """
         stats = self._source.getStats()
         return json.dumps({
-            'stats': stats
-            , 'paths': self._getPaths()
-            , 'dashboards': self._getDashboards()
-            , 'title': self._sourceConfig.get('name', 'LameGame StatView')
+            'stats': stats,
+            'paths': self._getPaths(),
+            'dashboards': self._getDashboards(),
+            'aliases': self._getAliases(),
+            'title': self._sourceConfig.get('name', 'LameGame StatView')
         })
+
+
+    @cherrypy.expose
+    @cherrypy.config(**{ 'response.headers.Content-Type': 'application/json' })
+    def saveAlias(self, groupDef):
+        if self._aliasStorage is None:
+            return json.dumps(dict(error = "Can't save without storage"))
+
+        dd = json.loads(groupDef)
+        dd['_id'] = dd.pop('id')
+        if dd['aliases']:
+            self._aliasStorage.save(dd)
+        else:
+            self._aliasStorage.delete(dd['_id'])
+        return json.dumps(dict(ok = True))
 
 
     @cherrypy.expose
@@ -158,6 +165,17 @@ class MainRoot(object):
         del dd['id']
         self._pathStorage.save(dd)
         return json.dumps(dict(ok = True))
+
+
+    def _getAliases(self):
+        """Return all aliases as [ { id: group, aliases: { from: to } } ]
+        """
+        if self._aliasStorage is None:
+            return {}
+        docs = list(self._aliasStorage.find())
+        for d in docs:
+            d['id'] = d.pop('_id')
+        return docs
 
 
     def _getDashboards(self):
