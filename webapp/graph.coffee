@@ -345,6 +345,11 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                         lastValue = rawData[i]
                     else
                         rawData[i] = lastValue
+                        # TODO here
+                        # If this were assigned 0, AND right-edge detection
+                        # were to be fixed (that is, a lack of reported values
+                        # should produce a gap), then we'd be able to tell when
+                        # an expected stat wasn't reported.
             else if aggregateType == 'count' or aggregateType == 'count-fuzzy'
                 for i in [4...rawData.length]
                     if rawData[i] == 'None'
@@ -456,6 +461,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             # keep track of the number of stats in our range
             # nz - non-zero
             nzStatsInRange = 0
+            # Used for total to ensure that we average all points in the window
+            # correctly.
+            nzStatParts = 0
 
             for pointTime in pointTimes
                 # We're actually going to compute a moving sum of partial data
@@ -497,13 +505,17 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                             movingTimeBase = movingTime
                             movingIndex += 1
                             if v != 0
+                                nzStatParts -= partLeft / srcInterval
                                 nzStatsInRange -= 1
                                 if nzStatsInRange == 0
                                     movingTotal = 0.0
+                                    nzStatParts = 0
                         else
                             # Take off part of the point and we're done
                             movingTotal -= (v *
                                     timeLeft / srcInterval)
+                            if v != 0
+                                nzStatParts -= timeLeft / srcInterval
                             movingTime = newTail
 
                 while srcIndex < rawData.length and srcTime < pointTime
@@ -537,6 +549,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                             # Rest of the point!
                             movingTotal += (v *
                                     partLeft / srcInterval)
+                            if v != 0
+                                nzStatParts += partLeft / srcInterval
                             srcTime = srcTimeBase + srcInterval
                             srcTimeBase = srcTime
                             srcIndex += 1
@@ -544,6 +558,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                             # Partial point and done
                             movingTotal += (v *
                                     timeLeft / srcInterval)
+                            if v != 0
+                                nzStatParts += timeLeft / srcInterval
                             srcTime = pointTime
 
                 # Now, add!
@@ -558,7 +574,10 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 else if aggregateType == 'total'
                     # These are set values, so adjust smoothing according to
                     # the srcInterval
-                    values.push(movingTotal * srcInterval / smoothSecs)
+                    if nzStatParts > 0
+                        values.push(movingTotal / nzStatParts)
+                    else
+                        values.push(0)
                 else
                     throw "Stat type summation not defined: " + stat.type
 
