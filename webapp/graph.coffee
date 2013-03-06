@@ -268,7 +268,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 
             requests = []
             i = 0
-            batch = 300
+            batch = 200
             while i < targets.length
                 u = i + batch
                 if u > targets.length
