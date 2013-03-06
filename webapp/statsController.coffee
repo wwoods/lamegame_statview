@@ -15,6 +15,8 @@ define [ 'cs!statPath', 'cs!stat' ], (StatPath, Stat) ->
             ### Re-parse our availableStats list, using paths.
             ###
             @stats = {}
+            # { statName : [ [ targetPath, groupValue1, groupValue2, ... ] ] }
+            @statToTarget = {}
             @usedStats = {}
             @inactiveStats = {}
             @groups = {}
@@ -48,6 +50,14 @@ define [ 'cs!statPath', 'cs!stat' ], (StatPath, Stat) ->
                 # We are using this stat, so add it to allStats so that
                 # we can actually load it
                 @usedStats[stat] = true
+                targetArray = [ stat ]
+                for group in result.groups
+                    targetArray.push(group[1])
+
+                if result.name not of @statToTarget
+                    @statToTarget[result.name] = [ targetArray ]
+                else
+                    @statToTarget[result.name].push(targetArray)
 
                 statInit =
                     name: result.name

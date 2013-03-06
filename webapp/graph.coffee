@@ -204,20 +204,32 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 else
                     groupFilters[group[0]] = baseValues
 
-            # We don't support * syntax outbound since we're not ONLY getting
-            # stats from graphite; fill in all possible values that aren't 
-            # already specified.  Plus, for global filters, it's kind of good
-            # that we are specifying everything.
-            for group of allGroups
-                if not (group of groupFilters)
-                    groups.push([ group ])
-                    groupFilters[group] = groupFiltersBase[group]
-
-            targetSet = {}
-            self._iterateTargets(targetSet, stats, {}, groups, 0, groupFilters)
             targets = []
-            for t of targetSet
-                targets.push(t)
+            # Build groupFilters into an array of arrays for quick checking of
+            # each stat, then iterate over all of our stats for each requested
+            # stat and request those that we are actually using.
+            groupTargetFilters = []
+            for group in stat.groups
+                if group not of groupFilters
+                    groupTargetFilters.push(null)
+                    continue
+
+                values = groupFilters[group]
+                g = {}
+                groupTargetFilters.push(g)
+                for value in values
+                    g[value] = true
+            for stat in stats
+                for possibleTarget in @_statsController.statToTarget[stat.name]
+                    isMatch = true
+                    for values, i in groupTargetFilters
+                        if (values != null and
+                                possibleTarget[i + 1] not of values)
+                            isMatch = false
+                            break
+                    if isMatch
+                        targets.push(possibleTarget[0])
+
             if targets.length == 0
                 self._display.empty()
                 self._createTitle()
@@ -1570,25 +1582,6 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                     hash = ((hash << 5) - hash) + char
                     hash = hash & hash # Make 32 bit integer
             return hash
-
-
-        _iterateTargets: (outputs, stats, statData, groups, groupIndex,
-                groupValues) ->
-            # Come up with all of the statistics we need to load for the 
-            # given path parameters
-            if groupIndex == groups.length
-                for stat in stats
-                    t = stat.getTarget(statData)
-                    if t of @_statsController.usedStats
-                        outputs[t] = true
-                return
-
-            name = groups[groupIndex][0]
-            values = groupValues[name]
-            for value in values
-                statData[name] = value
-                this._iterateTargets(outputs, stats, statData, groups,
-                        groupIndex + 1, groupValues)
 
 
         _onLoaded: (dataRaw, timeFrom, timeTo, options) ->

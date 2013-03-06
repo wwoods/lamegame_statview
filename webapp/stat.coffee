@@ -17,15 +17,20 @@ define [], (Stat) ->
             ###groupValues: { group : value }
             Returns a target path with *'s for groups that are unspecified
             ###
-            target = @path
-            for group in @groups
-                toReplace = '{' + group + '}'
-                value = '*'
-                if group of groupValues
-                    value = groupValues[group]
-                target = target.replace(toReplace, value)
-                
-            return target
+            if not @_targetParts
+                @_initTargetParts()
+
+            target = []
+            for tp in @_targetParts
+                if typeof tp == 'string'
+                    target.push(tp)
+                else
+                    value = '*'
+                    group = @groups[tp]
+                    if group of groupValues
+                        value = groupValues[group]
+                    target.push(value)
+            return target.join('')
 
 
         matchPath: (path) ->
@@ -47,4 +52,34 @@ define [], (Stat) ->
                     result[group] = match[2*(i + 1)].replace(/./, "$&")
             return result
 
-    
+
+        _initTargetParts: () ->
+            # String or index into @groups.
+            @_targetParts = []
+            pathIter = /\{/g
+
+            lastSpotEnd = -1
+            # Remember - regex lastIndex is 1 greater than the char index.
+            while (m = pathIter.exec(@path)) != null
+                # spot - open bracket position
+                spot = pathIter.lastIndex - 1
+                if spot > lastSpotEnd + 1
+                    @_targetParts.push(@path[lastSpotEnd + 1...spot])
+
+                spotEnd = /\}/g
+                spotEnd.lastIndex = spot + 1
+                spotEndMatch = spotEnd.exec(@path)
+                lastSpotEnd = spotEnd.lastIndex - 1
+                pathIter.lastIndex = lastSpotEnd + 2
+                spotGroup = @path[spot + 1...lastSpotEnd]
+
+                matched = false
+                for group, i in @groups
+                    if spotGroup == group
+                        @_targetParts.push(i)
+                        matched = true
+                        break
+                if not matched
+                    console.log("Unmatched group #{ spotGroup } of #{ @name }")
+                    @_targetParts.push("UM:" + spotGroup)
+            @_targetParts.push(@path[lastSpotEnd + 1..])
