@@ -27,8 +27,8 @@ class GraphiteSource(object):
             attempt += 1
             try:
                 return self._request(url, urlParms)
-            except urllib2.HTTPError:
-                if attempt < 3:
+            except urllib2.HTTPError, e:
+                if int(e.code) == 502 and attempt < 3:
                     continue
                 raise
 
