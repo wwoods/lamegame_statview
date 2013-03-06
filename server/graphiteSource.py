@@ -21,7 +21,16 @@ class GraphiteSource(object):
         for target in targetList:
             # Graphite takes multiple "target" params for different lines
             urlParms.append(('target', target))
-        return self._request(url, urlParms)
+
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                return self._request(url, urlParms)
+            except urllib2.HTTPError:
+                if attempt < 3:
+                    continue
+                raise
 
 
     def getStats(self):
