@@ -26,7 +26,12 @@ class GraphiteSource(object):
         while True:
             attempt += 1
             try:
-                return self._request(url, urlParms)
+                result = self._request(url, urlParms, keepGzip = True)
+                # Flag the response so we know it's encoded right
+                cherrypy.response.headers['Content-Encoding'] = 'gzip'
+                # This circumvents the gzip tool
+                cherrypy.request.cached = True
+                return result
             except urllib2.HTTPError, e:
                 if int(e.code) == 502 and attempt < 3:
                     continue
@@ -35,15 +40,15 @@ class GraphiteSource(object):
 
     def getStats(self):
         url = '/metrics/index.json'
-        req = self._request(url, keepGzip = False)
+        req = self._request(url)
         r = json.loads(req)
         return r
 
 
-    def _request(self, url, params = None, keepGzip = True):
+    def _request(self, url, params = None, keepGzip = False):
         """Make a request to graphite using our credentials.
 
-        keepGzip [True] - If True, keep GZIP'd.
+        keepGzip [False] - If True, keep GZIP'd.
         """
         urlBase = self._config['url']
         data = params
