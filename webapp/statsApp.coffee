@@ -1,7 +1,8 @@
 reqs = [ "cs!lib/ui", "cs!statsController", "cs!dashboard", "cs!statPathEditor", 
-        "cs!optionsEditor", "js-hash/Hash", "css!statsApp", "cs!aliasEditor" ]
+        "cs!optionsEditor", "js-hash/Hash", "css!statsApp", "cs!aliasEditor",
+        "cs!util" ]
 callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor, 
-        Hash, __css__, AliasEditor) ->
+        Hash, __css__, AliasEditor, util) ->
     class StatsHeader extends ui.Base
         constructor: (app, dashboards) ->
             super('<div class="stats-header"></div>')
@@ -31,9 +32,10 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
 
             @append("show me ")
             @timeAmt = $('<input type="text" />').appendTo(@)
-            @timeAmt.val('2 weeks')
+            @timeAmt.val('1 week')
             @timeAmt.bind "keyup", (e) =>
                 if e.which == 13 # enter
+                    $('.dashboard').trigger('needs-save')
                     @refresh.trigger("click")
             @append(" (hours/days/weeks/years) ")
             
@@ -41,9 +43,10 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                 .appendTo(@)
             overDiv.append("over ")
             @smoothAmt = $('<input type="text" />').appendTo(overDiv)
-            @smoothAmt.val('1 hour')
+            @smoothAmt.val('6 hours')
             @smoothAmt.bind "keyup", (e) =>
                 if e.which == 13 # enter
+                    $('.dashboard').trigger('needs-save')
                     @refresh.trigger("click")
             
             @append('&nbsp;&nbsp;&nbsp;&nbsp;')
@@ -126,6 +129,11 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             # longer need (unsaved)
             @picker.remove('(unsaved)')
 
+            # Clear out timeAmt and smoothAmt so that we'll load the values
+            # from the dashboard, or use defaults
+            @timeAmt.val('')
+            @smoothAmt.val('')
+
             if newVal == '(new)'
                 # Should show some confirmation, but...
                 @app.changeDashboard()
@@ -143,8 +151,9 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                     @namer.val(definition.id)
             
             # At this point, we've navigated to a dashboard,
-            # so set the hash
-            @_hashUpdate()
+            # so set the hash after letting it load
+            ui.setZeroTimeout () =>
+                @_hashUpdate()
                 
                 
         deleteDash: () ->
@@ -182,7 +191,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             ### Update the hash with a definition of our view.
             ###
             viewDef =
-                view: @picker.val()
+                view: @namer.val()
                 timeAmt: @timeAmt.val()
                 smoothAmt: @smoothAmt.val()
                 columns: @app.dashboard.container.columns
@@ -199,11 +208,28 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             ### Called when the current dashboard has been changed and needs
             to be saved.
             ###
-            if @picker.val() == '(unsaved)'
-                # Already done
-                return
-            @picker.addOption('(unsaved)')
-            @picker.select('(unsaved)')
+            savedDef = @app.dashboard.getSavedDefinition()
+            newDef = @app.dashboard.getDefinition()
+            newDef.id = @namer.val()
+
+            if not util.deepEquals(savedDef, newDef)
+                # Can save!
+                console.log("Diff defs: ")
+                console.log(savedDef)
+                console.log(newDef)
+                if @picker.val() == '(unsaved)'
+                    # Already done
+                    return
+                @picker.addOption('(unsaved)')
+                @picker.select('(unsaved)')
+            else
+                # Can't save because it's the same definition!
+                @_noRefresh = true
+                try
+                    @picker.select(@namer.val())
+                finally
+                    @_noRefresh = false
+                @picker.remove('(unsaved)')
 
 
         saveDash: () ->
@@ -258,6 +284,10 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                 success: (result) =>
                     if not result.ok
                         return onError(result)
+
+                    # Saved!  Tell the dashboard and reset the UI for our newly
+                    # saved dashboard.
+                    @app.dashboard.setSavedDefinition(newDef)
 
                     dlg.remove()
                     for d, i in @dashboards
@@ -317,6 +347,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                         # @dashboard is made in the hash selection
                 }
             )
+
 
         changeDashboard: (definition) ->
             # Change to the given dashboard
@@ -383,10 +414,6 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                     @header.picker.trigger('change')
             else
                 if obj.view?
-                    if obj.timeAmt?
-                        @header.timeAmt.val(obj.timeAmt)
-                    if obj.smoothAmt?
-                        @header.smoothAmt.val(obj.smoothAmt)
                     if obj.filters?
                         @header.globalFilters = obj.filters
                     else
@@ -401,7 +428,13 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                         @header.utcDates = false
                     if obj.columns
                         @header.columns = obj.columns
+                    # Apply dashboard before timeAmt and smoothAmt so that they
+                    # override the dashboard's settings.
                     @header.picker.select(obj.view)
+                    if obj.timeAmt?
+                        @header.timeAmt.val(obj.timeAmt)
+                    if obj.smoothAmt?
+                        @header.smoothAmt.val(obj.smoothAmt)
                 else
                     throw "Unknown hash: " + hash
                     

@@ -31,7 +31,8 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             @columns = columns
             @ratio = 0.618 # height / width
 
-            # Let us get added to dom, since we'll need a valid width
+            # Let us get added to dom, since we'll need a valid width and a
+            # valid reference to our @dashboard.
             ui.setZeroTimeout () =>
                 @app = ui.fromDom(@closest('.stats-app'))
                 @dashboard = @uiClosest('.dashboard')
@@ -42,8 +43,11 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
                 @_createNew = @append(@_createNew)
 
                 if definition?
+                    console.log(definition)
                     for config in definition.graphs
                         @append(new Graph(config, @dashboard))
+                    @dashboard.setTimeAmtIfBlank(definition.timeAmt)
+                    @dashboard.setSmoothAmtIfBlank(definition.smoothAmt)
 
 
         append: (graph, insertAfter) ->
@@ -108,6 +112,7 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             super('<div class="dashboard"></div>')
 
             @container = new DashboardContainer(definition, columns).appendTo(@)
+            @_savedDefinition = definition
             
             owidth = $(window).width()
             mySizer = () =>
@@ -141,6 +146,8 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             # Get the definition of this dashboard to save out
             result =
                 graphs: []
+                timeAmt: @getTimeAmt()
+                smoothAmt: @getSmoothAmt()
             for g in @container.children()
                 # Look at second-level child, since first is "cell" object
                 g = ui.fromDom($(g).children())
@@ -152,6 +159,10 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             
         getSanitize: () ->
             return ui.fromDom('.stats-header').sanitize
+
+
+        getSavedDefinition: () ->
+            return @_savedDefinition
             
             
         getSmoothAmt: () ->
@@ -174,3 +185,31 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             @container.refresh()
             
 
+        setTimeAmt: (amt) ->
+            ui.fromDom('.stats-header').timeAmt.val(amt)
+
+
+        setTimeAmtIfBlank: (amt) ->
+            ta = ui.fromDom('.stats-header').timeAmt
+            if ta.val() == ''
+                if amt
+                    ta.val(amt)
+                else
+                    ta.val('1 week')
+
+
+        setSavedDefinition: (definition) ->
+            @_savedDefinition = definition
+
+
+        setSmoothAmt: (amt) ->
+            ui.fromDom('.stats-header').smoothAmt.val(amt)
+
+
+        setSmoothAmtIfBlank: (amt) ->
+            ta = ui.fromDom('.stats-header').smoothAmt
+            if ta.val() == ''
+                if amt
+                    ta.val(amt)
+                else
+                    ta.val('6 hours')

@@ -65,12 +65,18 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             else if /m(in|inute)?s?$/.test(interval)
                 #Minutes
                 return parseFloat(interval) * 60
-            else if /h(ou)?r?s?$/.test(interval)
+            else if /[^a-zA-Z]h(ou)?r?s?$/.test(interval)
                 # Hours
                 return parseFloat(interval) * 60 * 60
             else if /w(ee)?k?s?$/.test(interval)
                 # Weeks
                 return parseFloat(interval) * 7 * 24 * 60 * 60
+            else if /mon(th)?s?$/.test(interval)
+                # Months; 30 days
+                return parseFloat(interval) * 30 * 24 * 60 * 60
+            else if /y(ea)?r?s?$/.test(interval)
+                # Years; 365 days
+                return parseFloat(interval) * 365 * 24 * 60 * 60
             else if /\d+$/.test(interval)
                 # default
                 return parseFloat(interval) * defaultInterval
