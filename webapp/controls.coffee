@@ -22,7 +22,7 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
                 @refresh()
                     
                 ui.Shade.show(@_content, hide: () =>
-                    ok.trigger("click")
+                    @_graph.update @getOptions()
                     @_content.hide()
                 )
             )
@@ -129,7 +129,7 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
 
             # Bind refresh button
             ok.bind 'click', () =>
-                @_graph.update @getOptions()
+                ui.Shade.hide()
 
             @_content.hide()
             if autoExpand
