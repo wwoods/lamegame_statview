@@ -25,3 +25,12 @@
     float: right;
 }
 
+.controls .groups-active {
+    list-style-type: circle;
+    padding-left: 1.8em;
+    padding-bottom: 0.5em;
+}
+
+.controls .groups-active li {
+    cursor: pointer;
+}

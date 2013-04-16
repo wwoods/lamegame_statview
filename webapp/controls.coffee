@@ -79,11 +79,11 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
             @expr.bind "change keyup", =>
                 @updateExpression(@expr.val())
 
-            @groupsActive = new ui.Base("<div></div>")
-            @groupsActive.delegate "div", "click", ->
+            @groupsActive = new ui.Base('<ul class="groups-active"></ul>')
+            @groupsActive.delegate "li", "click", ->
                 $(this).remove()
 
-            @_content.append "<div>Groups</div>"
+            @_content.append "<div>Group by</div>"
             @_content.append @groupsActive
             @_content.append "<div>Groups Available</div>"
             @groupList = new ui.ListBox(multiple: true)
@@ -190,7 +190,7 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
         _addGroupFilter: (group, filter = "") ->
             # Add a filter to the UI.  Done through either clicking group
             # in list, or during load
-            g = $("<div></div>").text(group).appendTo(@groupsActive)
+            g = $("<li></li>").text(group).appendTo(@groupsActive)
           
             # Stop click from removing the row
             $("<input class=\"regex\" type=\"text\" />").bind("click", ->
