@@ -10,15 +10,16 @@ requirejs.config({
         	deps: ['jquery','css!jquery.ui.theme/jquery-ui-custom'],
         	exports: '$.ui'
         }
-    }
-    , paths: {
+    },
+    paths: {
         'cs': '../lib/cs',
         'css': '../lib/css',
         'coffee-script': '../lib/coffee-script',
         'jquery': '../lib/jquery-1.8.2.min',
         "jquery.ui": "../lib/plugins/jquery.ui/jquery-ui-1.9.1.min",
         'lib': '../lib'
-    }
+    },
+    waitSeconds: 60
 });
 
 require(["cs!main"], function() {

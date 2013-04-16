@@ -288,7 +288,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             @siteTitle = document.title
             window.debug = false
 
-            @text('Loading, please wait')
+            @text('Loading application, please wait')
             $.ajax(
                 'getStartup'
                 {
