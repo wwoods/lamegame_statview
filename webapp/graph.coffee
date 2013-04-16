@@ -21,7 +21,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             @dashboard = dashboard
             self.config =
                 title: '(unnamed)'
-                type: 'area-zoom'
+                type: 'linear-zoom'
                 expr: ''
                 # List of (groupName, filterRegex) to break down results. 
                 # filterRegex is the text, and may be empty string for none

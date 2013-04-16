@@ -52,8 +52,8 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
             @_content.append('<br style="clear:both;"/>')
 
             @type = new ui.ListBox()
-            @type.addOption "area-zoom", "Area Zoom"
             @type.addOption "linear-zoom", "Linear Zoom"
+            @type.addOption "area-zoom", "Area Zoom"
             @type.addOption "area-period", "Area Periods (partial support)"
             # Not currently supported; @type.addOption "area", "Area"
             @_content.append(@type)
