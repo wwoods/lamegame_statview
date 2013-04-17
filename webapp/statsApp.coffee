@@ -1,8 +1,7 @@
 reqs = [ "cs!lib/ui", "cs!statsController", "cs!dashboard", "cs!statPathEditor", 
-        "cs!optionsEditor", "js-hash/Hash", "css!statsApp", "cs!aliasEditor",
-        "cs!util" ]
+        "cs!optionsEditor", "js-hash/Hash", "css!statsApp", "cs!aliasEditor" ]
 callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor, 
-        Hash, __css__, AliasEditor, util) ->
+        Hash, __css__, AliasEditor) ->
     class StatsHeader extends ui.Base
         constructor: (app, dashboards) ->
             super('<div class="stats-header"></div>')
@@ -212,7 +211,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             newDef = @app.dashboard.getDefinition()
             newDef.id = @namer.val()
 
-            if not util.deepEquals(savedDef, newDef)
+            if not $.compareObjs(savedDef, newDef)
                 # Can save!
                 console.log("Diff defs: ")
                 console.log(savedDef)
