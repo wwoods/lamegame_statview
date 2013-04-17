@@ -6,8 +6,9 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             
             
         remove: () ->
-            @trigger("needs-save")
+            parentToTrigger = @parent()
             super()
+            parentToTrigger.trigger("needs-save")
 
 
     class DashboardNew extends ui.Base

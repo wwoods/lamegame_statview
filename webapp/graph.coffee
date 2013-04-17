@@ -140,11 +140,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
 
             self = this
             if configChanges
-                for q of configChanges
-                    if not $.compareObjs(self.config[q], configChanges[q])
-                        # Something actually changed
-                        self.trigger("needs-save")
-                        break
+                # We might have changed, let the dashboard decide
+                self.trigger("needs-save")
                 $.extend(self.config, configChanges)
             
             # Clear out old autorefresh
