@@ -49,6 +49,10 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
                         @append(new Graph(config, @dashboard))
                     @dashboard.setTimeAmtIfBlank(definition.timeAmt)
                     @dashboard.setSmoothAmtIfBlank(definition.smoothAmt)
+                else
+                    # Must set timeAmt and smoothAmt to defaults
+                    @dashboard.setTimeAmtIfBlank(null)
+                    @dashboard.setSmoothAmtIfBlank(null)
 
 
         append: (graph, insertAfter) ->
