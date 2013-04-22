@@ -214,7 +214,10 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             groupTargetFilters = []
             for group in stat.groups
                 if group not of groupFilters
-                    groupTargetFilters.push(null)
+                    g = {}
+                    groupTargetFilters.push(g)
+                    for value in groupFiltersBase[group]
+                        g[value] = true
                     continue
 
                 values = groupFilters[group]
@@ -222,6 +225,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 groupTargetFilters.push(g)
                 for value in values
                     g[value] = true
+            console.log(groupTargetFilters)
             for stat in stats
                 for possibleTarget in @_statsController.statToTarget[stat.name]
                     isMatch = true
