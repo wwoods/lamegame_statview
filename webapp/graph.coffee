@@ -141,8 +141,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             self = this
             if configChanges
                 # We might have changed, let the dashboard decide
-                self.trigger("needs-save")
                 $.extend(self.config, configChanges)
+                self.trigger("needs-save")
             
             # Clear out old autorefresh
             if self._autoRefreshTimeout != null
