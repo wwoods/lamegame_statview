@@ -82,7 +82,9 @@ define [ 'cs!statPath', 'cs!stat' ], (StatPath, Stat) ->
                         console.log("Showing new def, then old def")
                         console.log(statDef)
                         console.log(@stats[result.name])
-                        throw "Same stat, different properties"
+                        result.name += ".BROKEN.EXAMPLE"
+                        alert("Same stat, different properties; see console")
+                        @stats[result.name] = statDef
                 else
                     @stats[result.name] = statDef
                         
