@@ -8,7 +8,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             @app = app
             @dashboards = dashboards
 
-            @picker = new ui.ListBox().appendTo(@)
+            @picker = new ui.ListBox(sorted: true).appendTo(@)
             @picker.addOption("(new)")
             for d in @dashboards
                 @picker.addOption(d.id)
