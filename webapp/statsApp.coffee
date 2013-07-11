@@ -307,6 +307,9 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                     
                     # And get rid of (unsaved) since it's been saved
                     @picker.remove('(unsaved)')
+
+                    # Update our hash
+                    @_hashUpdate()
                 error: onError
 
 
