@@ -1265,10 +1265,16 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             if absoluteMax == 0
                 absoluteMax = 1
 
-            for ds in subgroupSets
-                for i in [0...ds.length]
-                    ds[i].ynorm = (ds[i].ynormAlone *
-                            scalar(ds[i].ynormAlone) / absoluteMax)
+            # Keep track of the sum of all of a series' points so that we can
+            # sort the lines to minimize occlusion.
+            groupSums = []
+            for ds, i in subgroupSets
+                groupSum = 0.0
+                for j in [0...ds.length]
+                    ds[j].ynorm = (ds[j].ynormAlone *
+                            scalar(ds[j].ynormAlone) / absoluteMax)
+                    groupSum += ds[j].ynorm
+                groupSums.push([ i, groupSum ])
 
             # d3.layout.stack() adds the "y0" property to dataSets, and
             # stacks them
@@ -1284,20 +1290,15 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             if detailStackOrder?
                 stackOrder = detailStackOrder
             else
-                stackOrder = [0...subgroupSets.length]
+                stackOrder = groupSums[..]
+                stackOrder.sort (a, b) -> b[1] - a[1]
+                stackOrder = (s[0] for s in stackOrder)
 
-            restackData = () =>
-                # Run the d3.layout.stack on a sorted version of our
-                # subgroupSets; it's nice to keep the order that
-                # we pass them to the visualization the same so
-                # that the same colors represent the same objects
-                toStack = []
-                for i in stackOrder
-                    toStack.push(subgroupSets[i])
-                return stacksGen(toStack)
-
-            # Perform first stack
-            restackData()
+            reorderedSubGroups = []
+            for i in stackOrder
+                reorderedSubGroups.push(subgroupSets[i])
+            # Populate positions
+            stacksGen(reorderedSubGroups)
 
             # Draw the proportional bit
             self = @
@@ -1307,7 +1308,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 .y0((d) -> height - 0*d.y0 * height)
                 .y1((d) -> height - (d.ynorm + 0*d.y0) * height)
             detailVis.selectAll("path")
-                .data(subgroupSets).enter()
+                .data(reorderedSubGroups).enter()
                     .append("path")
                     .style("fill", (d) -> graphColors(d.title))
                     .attr("d", area)
@@ -1326,36 +1327,16 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                             console.log(arguments)
                             console.log(stackOrder)
 
-                        if di == stackOrder[0]
-                            # Already at the bottom, zoom in
-                            # Write out our current stackOrder to our
-                            # layer so that when it's restored, it will be
-                            # sorted like it was before
-                            layers[layers.length - 1][1] = stackOrder
+                        # Already at the bottom, zoom in
+                        # Write out our current stackOrder to our
+                        # layer so that when it's restored, it will be
+                        # sorted like it was before
+                        layers[layers.length - 1][1] = stackOrder
 
-                            # Push a new layer and re-render
-                            layers.push([ d.group, null ])
-                            @_drawGraph_zoom_layer(options)
-                            return
-
-                        # Remove current stackOrder == di and put it at 0
-                        # Swap current 0 with stackOrder == di
-                        diPos = -1
-                        for q, j in stackOrder
-                            if q == di
-                                diPos = j
-                                break
-
-                        stackOrder = stackOrder[...diPos].concat(
-                            stackOrder[diPos + 1..])
-                        stackOrder.unshift(di)
-
-                        restackData()
-                        detailVis.selectAll("path")
-                            .data(subgroupSets)
-                            .transition()
-                                .duration(1000)
-                                .attr("d", area)
+                        # Push a new layer and re-render
+                        layers.push([ d.group, null ])
+                        @_drawGraph_zoom_layer(options)
+                        return
                     )
 
             # Circular reference cleanup

@@ -1,6 +1,7 @@
-define ["cs!lib/ui", "css!statPathEditor"], (ui) ->
+define ["cs!lib/ui", "cs!statPath", "css!statPathEditor"], (ui, StatPath) ->
     class PathRow extends ui.Base
-        constructor: (pathDef) ->
+        constructor: (pathEditor, pathDef) ->
+            @pathEditor = pathEditor
             @pathDef = pathDef
             super('<tr class="path-row"></tr>')
             
@@ -19,7 +20,7 @@ define ["cs!lib/ui", "css!statPathEditor"], (ui) ->
             @path = new ui.TextBox(expand: true)
                 .appendTo($('<td></td>').appendTo(@))
             @path.val(pathDef.path)
-            @path.bind("keyup change", () => @update())
+            @path.bind("keyup change", () => @_updatePath())
             
             @type = new ui.ListBox().appendTo(@)
             @type.addOption("count", "Counter")
@@ -58,6 +59,23 @@ define ["cs!lib/ui", "css!statPathEditor"], (ui) ->
                 else
                     delete @pathDef.inactive
                 @isDirty = true
+
+
+        _updatePath: () ->
+            # Filter the stat path editor's availBlock according to what has
+            # been typed.
+            pathVal = @path.val()
+            if pathVal.lastIndexOf("*") != pathVal.length - 1
+                pathVal += "*"
+            re = StatPath.prototype.getRegexForPath(pathVal)
+            if @_timer?
+                clearTimeout(@_timer)
+            @_timer = setTimeout(
+                () => @pathEditor.flashOptions(re)
+                300)
+
+            @update()
+
             
 
     class StatPathEditor extends ui.Dialog
@@ -87,7 +105,7 @@ define ["cs!lib/ui", "css!statPathEditor"], (ui) ->
                         id: @_newPathId()
                         path: ''
                     @options.paths.push(newDef)
-                    @pathTable.append(new PathRow(newDef))
+                    @pathTable.append(new PathRow(@, newDef))
                 )
                 .appendTo(@pathBlock)
             @pathBlockUndo = new ui.Base(
@@ -100,6 +118,9 @@ define ["cs!lib/ui", "css!statPathEditor"], (ui) ->
             
             body.append('<div>Unused Paths</div>')
             @availBlock = new ui.ListBox(multiple: true).appendTo(body)
+            @availDouble = new ui.ListBox(multiple: true).insertAfter(
+                    @availBlock).hide()
+            @_availTimer = null
             @_updateAvailable()
             
             super(
@@ -146,7 +167,7 @@ define ["cs!lib/ui", "css!statPathEditor"], (ui) ->
                     return ia - ib
                 return a.path.localeCompare(b.path)
             for p in @options.paths
-                @pathTable.append(new PathRow(p))
+                @pathTable.append(new PathRow(@, p))
             
             
         remove: () ->
@@ -224,6 +245,27 @@ define ["cs!lib/ui", "css!statPathEditor"], (ui) ->
                 # Re-copy so that we still have our golden last-saved set
                 @options.paths.push($.extend(true, {}, cp))
             @refresh()
+
+
+        flashOptions: (re) ->
+            if @_availTimer?
+                clearTimeout(@_availTimer)
+            @_availTimer = setTimeout(
+                    () =>
+                        @availBlock.show()
+                        @availDouble.hide()
+                    2000)
+            @availDouble.reset()
+            @availBlock.hide()
+
+            self = this
+            @availBlock.children().each () ->
+                option = $(this).val()
+                if re.test(option)
+                    self.availDouble.addOption(option)
+                    if self.availDouble.children().length > 4
+                        return false
+            @availDouble.show()
                         
                         
         _newPathId: () ->
