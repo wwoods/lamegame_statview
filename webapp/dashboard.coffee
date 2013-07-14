@@ -130,6 +130,8 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
         refresh: () ->
             # Refresh all graphs
             for cell in @children()
+                # Only refresh visible graphs - that means they must be the
+                # 2nd-level child of the cell.
                 graph = ui.fromDom($(cell).children().children())
                 if graph instanceof Graph
                     graph.update()
@@ -201,8 +203,7 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
                 timeAmt: @getTimeAmt()
                 smoothAmt: @getSmoothAmt()
             for g in @container.children()
-                # Look at second-level child, since first is "cell" object
-                g = ui.fromDom($(g).children())
+                g = ui.fromDom($(g)).child
                 if not (g instanceof Graph)
                     continue
                 result.graphs.push($.extend({}, g.config))
