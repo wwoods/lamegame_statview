@@ -77,7 +77,7 @@ define ["cs!lib/ui", "css!optionsEditor"], (ui) ->
             sanDiv = $('<div></div>').appendTo(body)
             @sanitizer = $('<input type="checkbox" />').appendTo(sanDiv)
             if @optionsHolder.sanitize
-                @sanitizer.attr('checked', true)
+                @sanitizer.prop('checked', true)
             sanTip = $("<span>Sanitize graphs</span>").appendTo(sanDiv)
             sanTip.add(@sanitizer)
                 .bind("mouseover", (e) -> ui.Tooltip.show(e, """Sanitize the 
@@ -93,9 +93,16 @@ define ["cs!lib/ui", "css!optionsEditor"], (ui) ->
             utcDiv = $('<div></div>').appendTo(body)
             @utcDates = $('<input type="checkbox" />').appendTo(utcDiv)
             if @optionsHolder.utcDates
-                @utcDates.attr('checked', true)
+                @utcDates.prop('checked', true)
             utcTip = $("<span>Show dates in UTC rather than local</span>")
                     .appendTo(utcDiv)
+
+            alertDiv = $('<div>').appendTo(body)
+            @hideNonAlerted = $('<input type="checkbox" />').appendTo(alertDiv)
+            if @optionsHolder.hideNonAlerted
+                @hideNonAlerted.prop('checked', true)
+            hideTip = $("<span>Hide groups not failing alerts</span>")
+                    .appendTo(alertDiv)
             
             super(body: body)
             
@@ -105,11 +112,13 @@ define ["cs!lib/ui", "css!optionsEditor"], (ui) ->
             ###
             @optionsHolder.sanitize = @sanitizer.is(':checked')
             @optionsHolder.utcDates = @utcDates.is(':checked')
+            @optionsHolder.hideNonAlerted = @hideNonAlerted.is(':checked')
             @_refreshFilters()
             newSettings =
                 filters: @filters
                 sanitize: @optionsHolder.sanitize
                 utcDates: @optionsHolder.utcDates
+                hideNonAlerted: @optionsHolder.hideNonAlerted
             if not $.compareObjs(newSettings, @_initSettings)
                 if @options.onChange?
                     @options.onChange()

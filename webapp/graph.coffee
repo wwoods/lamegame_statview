@@ -1809,23 +1809,36 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             lastAlerts = @currentAlerts
             @currentAlerts = []
             if alertEval != null
-                addDataGroup = (dg, isSubgroup = true) =>
+                hideNonAlerted = @dashboard.getHideNonAlerted()
+                addDataGroup = (subgroupKey, dg) =>
                     values = dg.getGraphPoints()
                     curVal = values[values.length - 1].y
                     alertInputs = { currentValue: curVal }
                     if alertEval.eval(alertInputs)
                         title = @config.title
-                        if isSubgroup
+                        if subgroupKey?
                             title += " - #{ dg.title }"
                         @currentAlerts.push(
                                 "#{title} (#{ @_formatValue(curVal) })")
 
+                        dg.hasAlert = true
+                    else if hideNonAlerted and subgroupKey?
+                        delete data.subgroups[subgroupKey]
+                        for stat, values of data.values
+                            newValues = []
+                            for v in values
+                                if v.groups[@config.groups[0][0]] != subgroupKey
+                                    newValues.push(v)
+                            data.values[stat] = newValues
+                        # Note that we do not need to wipe out old calculations
+                        # since the parent will not be calculated (cached) yet
+
                 if @config.groups.length == 0
                     # Not subdivided
-                    addDataGroup(data, false)
+                    addDataGroup(null, data)
                 else
                     for subgroupId, subgroup of data.subgroups
-                        addDataGroup(subgroup)
+                        addDataGroup(subgroupId, subgroup)
 
             if not $.compareObjs(@currentAlerts, lastAlerts)
                 @dashboard.app.alertsChanged()

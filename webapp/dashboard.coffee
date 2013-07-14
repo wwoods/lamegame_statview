@@ -219,6 +219,10 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
                 if graph instanceof Graph
                     r.push(graph)
             return r
+
+
+        getHideNonAlerted: () ->
+            return ui.fromDom('.stats-header').hideNonAlerted
             
             
         getSanitize: () ->

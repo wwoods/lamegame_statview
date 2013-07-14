@@ -30,7 +30,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             $('<span style="margin-right:1em;">').text("Autorefresh")
                     .appendTo(@)
             @refresh.bind("change", () =>
-                    @_hashUpdate()
+                    @hashUpdate()
                     if @refresh.is(':checked')
                         @autoRefreshInterval = @AUTO_REFRESH_INTERVAL
                         @app.dashboard.refresh()
@@ -60,6 +60,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             @append('&nbsp;&nbsp;&nbsp;&nbsp;')
             @sanitize = false
             @utcDates = false
+            @hideNonAlerted = false
             @columns = 2
             @autoRefreshInterval = @AUTO_REFRESH_INTERVAL
             @globalFilters = {}
@@ -96,7 +97,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                 .bind("click", () =>
                     @columns = Math.max(@columns - 1, 1)
                     @app.dashboard.changeColumns(@columns)
-                    @_hashUpdate()
+                    @hashUpdate()
                 )
             @columnAdd = new ui.Base(
                     '<div class="stats-header-button">+</div>'
@@ -106,7 +107,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                 .bind("click", () =>
                     @columns += 1
                     @app.dashboard.changeColumns(@columns)
-                    @_hashUpdate()
+                    @hashUpdate()
                 )
                 
             @pathPicker = new ui.Base(
@@ -162,7 +163,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             # At this point, we've navigated to a dashboard,
             # so set the hash after letting it load
             ui.setZeroTimeout () =>
-                @_hashUpdate()
+                @hashUpdate()
                 
                 
         deleteDash: () ->
@@ -196,7 +197,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                 error: onError
                 
                 
-        _hashUpdate: () ->
+        hashUpdate: () ->
             ### Update the hash with a definition of our view.
             ###
             viewDef =
@@ -208,6 +209,8 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                 viewDef.sanitize = true
             if @utcDates
                 viewDef.utcDates = true
+            if @hideNonAlerted
+                viewDef.hideNonAlerted = true
             if not @refresh.is(':checked')
                 viewDef.noAutoRefresh = true
             if not $.compareObjs({}, @globalFilters)
@@ -326,7 +329,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                     @picker.remove('(unsaved)')
 
                     # Update our hash
-                    @_hashUpdate()
+                    @hashUpdate()
                 error: onError
 
 
@@ -427,6 +430,8 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
 
 
         refresh: () ->
+            # Ensure hash is up to date
+            @header.hashUpdate()
             @dashboard.refresh()
                 
                 
@@ -463,6 +468,10 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                         @header.utcDates = true
                     else
                         @header.utcDates = false
+                    if obj.hideNonAlerted
+                        @header.hideNonAlerted = true
+                    else
+                        @header.hideNonAlerted = false
                     if obj.columns
                         @header.columns = obj.columns
                     if obj.noAutoRefresh
