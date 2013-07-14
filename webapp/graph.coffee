@@ -51,7 +51,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                     </div>').appendTo(@_overlay)
             self.currentAlerts = []
 
-            if config
+            if config and @config.alert? and @config.alert != ''
                 # We want to trigger alerts immediately, regardless of the state
                 # of expand or collapse
                 @_requestData(
