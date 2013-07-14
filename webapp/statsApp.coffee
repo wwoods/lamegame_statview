@@ -161,7 +161,8 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                     @namer.val(definition.id)
             
             # At this point, we've navigated to a dashboard,
-            # so set the hash after letting it load
+            # so set the hash after letting it load and clear alerts now
+            @app.alertsChanged()
             ui.setZeroTimeout () =>
                 @hashUpdate()
                 
