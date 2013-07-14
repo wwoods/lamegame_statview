@@ -185,6 +185,12 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             
             # Ensure we respect the global filters; fill out 
             globalFilters = @dashboard.getAllowedGroupValues()
+            self._missingFilter = false
+            for group of globalFilters
+                if group not of allGroups
+                    self._missingFilter = true
+                    break
+
             groupFiltersBase = {}
             for group of allGroups
                 if group of globalFilters
@@ -684,6 +690,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 if title.length == 0
                     title = $(titleHtml).appendTo(@_display)
             title.text(@config.title)
+            if @_missingFilter
+                title.append('<span style="color:#f00;"> missed by filter</span>')
+            return title
         
         
         _drawAxis: (options) ->
