@@ -10,7 +10,7 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
                 @inner.text(child.getTitle())
                 @inner.bind 'click', => @expand()
                 @inner.bind 'mousedown', (e) =>
-                    if e.which == 1
+                    if @hasClass('collapsed') and e.which == 1
                         @_expandAllMaybe()
             else
                 @inner.append(child)
