@@ -394,17 +394,40 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 aggregateType = 'count-fuzzy'
             
             # First thing's first - if we're a total, we need to replace all
-            # 'None' values with the last value.  If we're a count, just
-            # replace all 'None' values with 0.
+            # 'None' values an interpolation of the next and last values.
+            # If we're a count, just replace all 'None' values with 0.
             hasData = false
             if aggregateType == 'total'
-                lastValue = 0;
+                lastValue = null
+                lastValueI = 0
+                nextValue = null
+                nextValueI = -1
                 for i in [4...rawData.length]
                     if rawData[i] != 'None'
                         hasData = true
-                        lastValue = rawData[i]
+                        lastValue = parseFloat(rawData[i])
+                        lastValueI = i
                     else
-                        rawData[i] = lastValue
+                        if i > nextValueI
+                            for j in [i + 1...rawData.length]
+                                if rawData[j] != 'None'
+                                    nextValueI = j
+                                    nextValue = parseFloat(rawData[j])
+                                    break
+                            if i > nextValueI
+                                # No more data; drag out last value
+                                nextValueI = rawData.length
+                                nextValue = null
+
+                        if lastValue == null
+                            # Haven't seen any values, use nextValue
+                            rawData[i] = nextValue
+                        else if nextValue == null
+                            rawData[i] = lastValue
+                        else
+                            # Interpolate!
+                            u = (i - lastValueI) / (nextValueI - lastValueI)
+                            rawData[i] = u * nextValue + (1.0 - u) * lastValue
                         # TODO here
                         # If this were assigned 0, AND right-edge detection
                         # were to be fixed (that is, a lack of reported values
