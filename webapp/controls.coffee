@@ -20,6 +20,11 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
             @_expandCollapse.bind('click', () =>
                 @_content.show()
                 @refresh()
+
+                @_content.css(left: 0)
+                if (@_content.offset().left + @_content.outerWidth() \
+                        > $(window).width())
+                    @_content.css(left: -@_content.outerWidth())
                     
                 ui.Shade.show(@_content, hide: () =>
                     @_graph.update @getOptions()
@@ -133,7 +138,7 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
 
             @_content.hide()
             if autoExpand
-                @_expandCollapse.trigger("click")
+                ui.setZeroTimeout => @_expandCollapse.trigger("click")
 
 
         getOptions: () ->
