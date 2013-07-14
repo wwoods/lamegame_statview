@@ -9,7 +9,9 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
                 @addClass("collapsed")
                 @inner.text(child.getTitle())
                 @inner.bind 'click', => @expand()
-                @inner.bind 'mousedown', => @_expandAllMaybe()
+                @inner.bind 'mousedown', (e) =>
+                    if e.which == 1
+                        @_expandAllMaybe()
             else
                 @inner.append(child)
                 # Let our sizing, etc be assigned
