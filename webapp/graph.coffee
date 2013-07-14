@@ -50,9 +50,10 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             self._loadingOverlay = $('<div class="graph-loading-overlay">
                     </div>').appendTo(@_overlay)
 
-            # Render once we're attached to dashboard
-            ui.setZeroTimeout () =>
-                self.update()
+
+        getTitle: () ->
+            """Called when collapsed; when expanded, update() is called."""
+            return @config.title
 
 
         parseInterval: (interval, defaultInterval = 60*60) ->
@@ -163,9 +164,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                     ' (Loading data, please wait)')
 
             # Set up next autorefresh
-            autoRefresh = self.config.autoRefresh
-            if autoRefresh == ''
-                autoRefresh = @dashboard.getAutoRefresh()
+            autoRefresh = self._getAutoRefresh()
             if autoRefresh > 0
                 self._autoRefreshNext = (new Date().getTime() / 1000)
                 self._autoRefreshNext += autoRefresh
@@ -225,7 +224,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 groupTargetFilters.push(g)
                 for value in values
                     g[value] = true
-            console.log(groupTargetFilters)
+            #console.log(groupTargetFilters)
             for stat in stats
                 for possibleTarget in @_statsController.statToTarget[stat.name]
                     isMatch = true
@@ -607,6 +606,11 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
         _autoRefresh: () ->
             ###Refresh!
             ###
+
+            # Do we no longer have permission to auto refresh?
+            if not (@_getAutoRefresh() > 0)
+                return
+
             if @_blockAutoRefresh
                 @_autoRefreshTimeout = setTimeout(
                         () => @_autoRefresh(),
@@ -1519,6 +1523,14 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             if isNeg
                 valStr = '-' + valStr
             return valStr
+
+
+        _getAutoRefresh: () ->
+            # Return the current auto refresh interval in seconds
+            autoRefresh = @config.autoRefresh
+            if autoRefresh == ''
+                autoRefresh = @dashboard.getAutoRefresh()
+            return autoRefresh
             
             
         _getColorHex: (r, g, b) ->
@@ -1707,6 +1719,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 g = new Graph(cfg, @dashboard)
                 page = $('<div class="graph-fullscreen"></div>')
                 page.append(g).appendTo('body')
+                g.update()
                 page.bind 'click', (e) =>
                     if e.target == page[0]
                         page.remove()

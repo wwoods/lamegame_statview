@@ -65,6 +65,10 @@ Thanks for your time!
 
 ## Appendix
 
+### Graphs are auto-collapsed by default
+
+Click on one to show it.  Click and hold for one second to show all.
+
 ### Expressions
 
 You can also use "for each {group} add {expression}" for fancy bits.  For 

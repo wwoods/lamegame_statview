@@ -2,13 +2,47 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
     class DashboardCell extends ui.Base
         constructor: (child) ->
             super('<div class="dashboard-cell"></div>')
-            @append(child)
+            @inner = $('<div class="dashboard-cell-inner">').appendTo(@)
+
+            @child = child
+            if not child.noCollapse
+                @addClass("collapsed")
+                @inner.text(child.getTitle())
+                @inner.bind 'click', => @expand()
+                @inner.bind 'mousedown', => @_expandAllMaybe()
+            else
+                @inner.append(child)
+                # Let our sizing, etc be assigned
+                ui.setZeroTimeout =>
+                    child.update()
+
+
+        expand: () ->
+            if not @hasClass("collapsed")
+                return
+            @removeClass("collapsed")
+            @inner.empty().append(@child)
+            @trigger("cell-expand")
+            @child.update()
             
             
         remove: () ->
             parentToTrigger = @parent()
             super()
             parentToTrigger.trigger("needs-save")
+
+
+        _expandAllMaybe: () ->
+            # Triggered on mousedown, time until mouseup or 1 second, in which
+            # case expand EVERYTHING.
+            seenUp = [ false ]
+            $(document).one 'mouseup', => seenUp[0] = true
+            t = setTimeout(
+                    =>
+                        if not seenUp[0]
+                            $('.dashboard-cell.collapsed').each ->
+                                ui.fromDom(this).expand()
+                    1000)
 
 
     class DashboardNew extends ui.Base
@@ -19,6 +53,12 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
                     <tr>
                       <td style="vertical-align:middle;">Add New...</td>
                     </tr></table>')
+
+            @noCollapse = true
+
+
+        update: () ->
+            "ok"
 
 
     class DashboardContainer extends ui.DragContainer
@@ -40,7 +80,9 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
 
                 @_createNew = new DashboardNew()
                 @_createNew.bind "click", () =>
-                    @append(new Graph(null, @dashboard))
+                    g = new Graph(null, @dashboard)
+                    g.noCollapse = true
+                    @append(g)
                 @_createNew = @append(@_createNew)
 
                 if definition?
@@ -61,6 +103,9 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             Returns the new cell
             ###
             cell = new DashboardCell(graph)
+            cell.bind "cell-expand cell-collapse", =>
+                @_resizeCell(cell)
+                return false
             @_resizeCell(cell)
             # Window width can change on insert
             oSize = $(window).width()
@@ -85,7 +130,7 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
         refresh: () ->
             # Refresh all graphs
             for cell in @children()
-                graph = ui.fromDom($(cell).children())
+                graph = ui.fromDom($(cell).children().children())
                 if graph instanceof Graph
                     graph.update()
 
@@ -106,6 +151,8 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
                 return
             w = (@width() - 1) / @columns
             h = Math.min(w * @ratio, $(window).height() - @app.header.height())
+            if cell.is('.collapsed')
+                h = '1.5em'
             cell.css
                 width: w
                 height: h
@@ -144,7 +191,7 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
 
 
         getAutoRefresh: () ->
-            return 300
+            return ui.fromDom('.stats-header').autoRefreshInterval
 
 
         getDefinition: () ->

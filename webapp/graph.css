@@ -7,10 +7,6 @@
     bottom: 0;
     left: 0;
     display: inline-block;
-
-    margin: 2px;
-    border: solid 1px #ddd;
-    border-radius: 0.25em;
 }
 .graph-fullscreen {
     position: fixed;

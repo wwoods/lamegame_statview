@@ -4,6 +4,28 @@
 .dashboard-cell {
     display: inline-block;
     position: relative;
+    vertical-align: top;
+}
+
+.dashboard-cell-inner {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+
+    margin: 2px;
+    border: solid 1px #ddd;
+    border-radius: 0.25em;
+}
+
+.dashboard-cell.collapsed .dashboard-cell-inner {
+    padding-left: 1.6em;
+    cursor: pointer;
+}
+
+.dashboard-cell.collapsed:hover .dashboard-cell-inner {
+    background-color: #efe;
 }
 
 .dashboard-container {

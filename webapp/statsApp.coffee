@@ -3,6 +3,8 @@ reqs = [ "cs!lib/ui", "cs!statsController", "cs!dashboard", "cs!statPathEditor",
 callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor, 
         Hash, __css__, AliasEditor) ->
     class StatsHeader extends ui.Base
+        AUTO_REFRESH_INTERVAL: 300
+
         constructor: (app, dashboards) ->
             super('<div class="stats-header"></div>')
             @app = app
@@ -23,10 +25,16 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             @deleter = $('<input type="submit" value="Delete" />').appendTo(@)
             @deleter.bind("click", () => @deleteDash())
 
-            @refresh = $('<input type="submit" value="Refresh" />').appendTo(@)
-            @refresh.bind("click", () =>
+            @refresh = $('<input type="checkbox" checked="checked">').appendTo(@)
+            $('<span style="margin-right:1em;">').text("Autorefresh")
+                    .appendTo(@)
+            @refresh.bind("change", () =>
                     @_hashUpdate()
-                    @app.dashboard.refresh()
+                    if @refresh.is(':checked')
+                        @autoRefreshInterval = @AUTO_REFRESH_INTERVAL
+                        @app.dashboard.refresh()
+                    else
+                        @autoRefreshInterval = 0
             )
 
             @append("show me ")
@@ -35,7 +43,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             @timeAmt.bind "keyup", (e) =>
                 if e.which == 13 # enter
                     $('.dashboard').trigger('needs-save')
-                    @refresh.trigger("click")
+                    @app.refresh()
             @append(" (hours/days/weeks/years) ")
             
             overDiv = $('<div style="white-space:nowrap;display:inline-block;"></div>')
@@ -46,12 +54,13 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             @smoothAmt.bind "keyup", (e) =>
                 if e.which == 13 # enter
                     $('.dashboard').trigger('needs-save')
-                    @refresh.trigger("click")
+                    @app.refresh()
             
             @append('&nbsp;&nbsp;&nbsp;&nbsp;')
             @sanitize = false
             @utcDates = false
             @columns = 2
+            @autoRefreshInterval = @AUTO_REFRESH_INTERVAL
             @globalFilters = {}
             @globalFilters_doc = "Dict of filters: { group: [ values ] }"
             @optionsEdit = new ui.Base(
@@ -62,7 +71,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                         filters: @globalFilters
                         statsController: @app._statsController
                         optionsHolder: @
-                        onChange: () => @refresh.trigger("click")
+                        onChange: () => app.refresh()
                     )
                 )
                 .bind("mouseover", (e) =>
@@ -198,6 +207,8 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                 viewDef.sanitize = true
             if @utcDates
                 viewDef.utcDates = true
+            if not @refresh.is(':checked')
+                viewDef.noAutoRefresh = true
             if not $.compareObjs({}, @globalFilters)
                 viewDef.filters = @globalFilters
             Hash.update(JSON.stringify(viewDef))
@@ -393,6 +404,10 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             ###
             @css
                 paddingTop: @header.outerHeight(true)
+
+
+        refresh: () ->
+            @dashboard.refresh()
                 
                 
         setTitle: (title) ->
@@ -430,6 +445,12 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                         @header.utcDates = false
                     if obj.columns
                         @header.columns = obj.columns
+                    if obj.noAutoRefresh
+                        @header.refresh.prop("checked", false)
+                        @header.autoRefreshInterval = 0
+                    else
+                        @header.refresh.prop("checked", true)
+                        @header.autoRefreshInterval = @header.AUTO_REFRESH_INTERVAL
                     # Apply dashboard before timeAmt and smoothAmt so that they
                     # override the dashboard's settings.
                     @header.picker.select(obj.view)
