@@ -37,6 +37,7 @@
     /* Align after controls collapser */
     position: relative;
     left: 1.6em;
+    margin-right: 1.6em;
 }
 .graph-title:hover {
     background-color: #eee;
