@@ -12,9 +12,10 @@ define [ 'cs!lib/ui', 'cs!alertEvaluator', 'css!controls' ], (ui) ->
             @_content = $('<div class="controls-content"></div>')
             @append(@_content)
 
-            @bind('click', () =>
+            @bind('click', (e) =>
                 # Stop it from affecting graph
-                return false
+                if not $(e.target).is('input')
+                    return false
             )
 
             @_expandCollapse.bind('click', () =>
@@ -111,6 +112,10 @@ define [ 'cs!lib/ui', 'cs!alertEvaluator', 'css!controls' ], (ui) ->
             @alert = $('<input type="text">').appendTo(alerts)
             @alert.bind "change keyup", =>
                 @updateAlert(@alert.val())
+            hideNonAlerts = $('<div>').appendTo(alerts)
+            @hideNonAlerted = $('<input type="checkbox" />').appendTo(
+                    hideNonAlerts)
+            hideNonAlerts.append("Hide lines not failing alert")
 
             ok = new ui.Base("<input type=\"button\" value=\"Refresh\" />")
             @_content.append ok
@@ -166,6 +171,8 @@ define [ 'cs!lib/ui', 'cs!alertEvaluator', 'css!controls' ], (ui) ->
                 smoothOver: @smoother.val()
                 timeAmt: @timeDivAmt.val()
                 autoRefresh: ''
+            if @hideNonAlerted.prop('checked')
+                options.hideNonAlerted = true
             return options
                 
                 
@@ -226,4 +233,5 @@ define [ 'cs!lib/ui', 'cs!alertEvaluator', 'css!controls' ], (ui) ->
             @alert.val(options.alert)
             @smoother.val(options.smoothOver)
             @timeDivAmt.val(options.timeAmt)
+            @hideNonAlerted.prop('checked', options.hideNonAlerted)
 

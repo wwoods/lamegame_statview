@@ -42,7 +42,7 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
                         if not seenUp[0]
                             $('.dashboard-cell.collapsed').each ->
                                 ui.fromDom(this).expand()
-                    1000)
+                    700)
 
 
     class DashboardNew extends ui.Base

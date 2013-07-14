@@ -101,7 +101,7 @@ define ["cs!lib/ui", "css!optionsEditor"], (ui) ->
             @hideNonAlerted = $('<input type="checkbox" />').appendTo(alertDiv)
             if @optionsHolder.hideNonAlerted
                 @hideNonAlerted.prop('checked', true)
-            hideTip = $("<span>Hide groups not failing alerts</span>")
+            hideTip = $("<span>Hide groups not failing alerts, even if graph normally shows them</span>")
                     .appendTo(alertDiv)
             
             super(body: body)

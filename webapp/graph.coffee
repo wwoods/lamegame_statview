@@ -1809,7 +1809,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             lastAlerts = @currentAlerts
             @currentAlerts = []
             if alertEval != null
-                hideNonAlerted = @dashboard.getHideNonAlerted()
+                hideNonAlerted = @dashboard.getHideNonAlerted() or @config.hideNonAlerted
                 addDataGroup = (subgroupKey, dg) =>
                     values = dg.getGraphPoints()
                     curVal = values[values.length - 1].y
