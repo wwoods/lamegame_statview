@@ -116,6 +116,9 @@ define [ 'cs!lib/ui', 'cs!alertEvaluator', 'css!controls' ], (ui) ->
             @hideNonAlerted = $('<input type="checkbox" />').appendTo(
                     hideNonAlerts)
             hideNonAlerts.append("Hide lines not failing alert")
+                    .bind "click", =>
+                        @hideNonAlerted.prop('checked',
+                                not @hideNonAlerted.prop('checked'))
 
             ok = new ui.Base("<input type=\"button\" value=\"Refresh\" />")
             @_content.append ok
