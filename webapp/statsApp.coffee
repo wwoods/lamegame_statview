@@ -1,7 +1,8 @@
 reqs = [ "cs!lib/ui", "cs!statsController", "cs!dashboard", "cs!statPathEditor", 
-        "cs!optionsEditor", "js-hash/Hash", "css!statsApp", "cs!aliasEditor" ]
+        "cs!optionsEditor", "js-hash/Hash", "css!statsApp", "cs!aliasEditor",
+        "cs!alertsDisplay" ]
 callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor, 
-        Hash, __css__, AliasEditor) ->
+        Hash, __css__, AliasEditor, AlertsDisplay) ->
     class StatsHeader extends ui.Base
         AUTO_REFRESH_INTERVAL: 300
 
@@ -224,14 +225,19 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
 
             if not $.compareObjs(savedDef, newDef)
                 # Can save!
-                console.log("Diff defs: ")
-                console.log(savedDef)
-                console.log(newDef)
+                if window.debug
+                    console.log("Diff defs: ")
+                    console.log(savedDef)
+                    console.log(newDef)
                 if @picker.val() == '(unsaved)'
                     # Already done
                     return
                 @picker.addOption('(unsaved)')
                 @picker.select('(unsaved)')
+
+                # Since the layout has changed, it is also very possible that
+                # alerts have changed.
+                @app.alertsChanged()
             else
                 # Can't save because it's the same definition!
                 @_noRefresh = true
@@ -331,6 +337,9 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             @siteTitle = document.title
             window.debug = false
 
+            @alertsDisplay = new AlertsDisplay()
+            @alertsDisplay.appendTo('body')
+
             @text('Loading application, please wait')
             $.ajax(
                 'getStartup'
@@ -360,6 +369,17 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                         # @dashboard is made in the hash selection
                 }
             )
+
+
+        alertsChanged: () ->
+            # Scan all graphs and display alerts
+            if not @dashboard?
+                return
+
+            allAlerts = []
+            for g in @dashboard.getGraphs()
+                allAlerts.push.apply(allAlerts, g.currentAlerts)
+            @alertsDisplay.setAlerts(allAlerts)
 
 
         changeDashboard: (definition) ->

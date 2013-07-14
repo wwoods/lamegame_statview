@@ -77,6 +77,7 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             ui.setZeroTimeout () =>
                 @app = ui.fromDom(@closest('.stats-app'))
                 @dashboard = @uiClosest('.dashboard')
+                @dashboard.app = @app
 
                 @_createNew = new DashboardNew()
                 @_createNew.bind "click", () =>
@@ -208,6 +209,16 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
                     continue
                 result.graphs.push($.extend({}, g.config))
             return result
+
+
+        getGraphs: () ->
+            # Return a list of all graphs, whether collapsed or not.
+            r = []
+            for g in @container.children()
+                graph = ui.fromDom($(g)).child
+                if graph instanceof Graph
+                    r.push(graph)
+            return r
             
             
         getSanitize: () ->

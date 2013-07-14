@@ -1,0 +1,48 @@
+/*
+ * Grammar for parsing alert expressions
+ * Designed using PegJS - http://pegjs.majda.cz/
+ */
+
+start
+  = cmp:compare_op __ expr:expression {
+      return { op: "alert", compare: cmp, expr: expr };
+    }
+
+
+/* White space */
+__
+  = [ \t\n]*
+
+
+compare_op
+  = ">"
+  / "<"
+  / ">="
+  / "<="
+  / "="
+  / "==" { return "="; }
+
+
+expression
+  = number
+
+
+number "number"
+  = neg:"-"? digits:[0-9]* "." decimal:[0-9]* {
+      var t = digits.join("") + '.' + decimal.join("")
+      if (neg) {
+        t = "-" + t;
+      }
+      return { "op": "c", "constant": parseFloat(t) };
+    }
+  / integer
+
+
+integer "integer"
+  = neg:"-"? digits:[0-9]+ {
+      var t = digits.join("");
+      if (neg) {
+        t = "-" + t;
+      }
+      return { "op": "c", "constant": parseInt(t, 10) };
+    }

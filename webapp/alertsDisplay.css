@@ -1,0 +1,23 @@
+.alerts-display {
+    cursor: pointer;
+    position: fixed;
+    z-index: 1;
+    right: 0;
+    bottom: 0;
+    max-height: 300px;
+    min-height: 1.1em;
+    width: 30em;
+    overflow-y: auto;
+    background-color: #f80;
+    border: solid 1px #444;
+}
+
+.alerts-display.collapsed {
+    width: 0.9em;
+    height: 0.9em;
+    overflow: visible;
+}
+
+.alerts-display.ok {
+    background-color: #0f0;
+}

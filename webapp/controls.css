@@ -34,3 +34,16 @@
 .controls .groups-active li {
     cursor: pointer;
 }
+
+.controls-alert {
+    margin-top: 1em;
+    color: #311;
+}
+
+.controls-alert input {
+    color: #000;
+}
+
+.controls-alert input.wrong {
+    color: red;
+}

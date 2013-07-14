@@ -1,4 +1,4 @@
-define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
+define [ 'cs!lib/ui', 'cs!alertEvaluator', 'css!controls' ], (ui) ->
     class Controls extends ui.Base
         constructor: (graph, autoExpand) ->
             super('<div class="controls"></div>')
@@ -106,6 +106,12 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
             @timeDivAmt = $('<input type="text" />').appendTo(timeDiv)
             @_content.append(timeDiv)
 
+            alerts = $('<div class="controls-alert">').appendTo(@_content)
+            alerts.append('Alert if: ')
+            @alert = $('<input type="text">').appendTo(alerts)
+            @alert.bind "change keyup", =>
+                @updateAlert(@alert.val())
+
             ok = new ui.Base("<input type=\"button\" value=\"Refresh\" />")
             @_content.append ok
 
@@ -155,6 +161,7 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
                 type: @type.val()
                 stats: @_statsFound
                 expr: @expr.val()
+                alert: @alert.val()
                 groups: groups
                 smoothOver: @smoother.val()
                 timeAmt: @timeDivAmt.val()
@@ -174,6 +181,14 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
             @groupsActive.empty()
             for grp in @_graph.config.groups
                 @_addGroupFilter(grp[0], grp[1])
+
+
+        updateAlert: (expr) ->
+            p = @_graph.parseAlert(expr)
+            if p == null
+                @alert.addClass('wrong')
+            else
+                @alert.removeClass('wrong')
 
 
         updateExpression: (expr) ->
@@ -208,6 +223,7 @@ define [ 'cs!lib/ui', 'css!controls' ], (ui) ->
             @type.select(options.type)
             @title.val(options.title)
             @expr.val(options.expr)
+            @alert.val(options.alert)
             @smoother.val(options.smoothOver)
             @timeDivAmt.val(options.timeAmt)
 

@@ -1,6 +1,6 @@
 reqs = [ 'cs!lib/ui', 'cs!stat', 'cs!controls', 'cs!dataset', 'cs!datagroup',
-        'cs!expressionEvaluator', 'css!graph' ]
-module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
+        'cs!expressionEvaluator', 'cs!alertEvaluator', 'css!graph' ]
+module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
     # d3.scale.category20 does something cool - it returns a method that gives
     # you a color from a rotating list of 20.  What's cool is that it keeps
     # a map of values it has seen before - that is, if we keep a global
@@ -49,6 +49,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
             self._overlay = $('<div class="graph-overlay"></div>').appendTo(@)
             self._loadingOverlay = $('<div class="graph-loading-overlay">
                     </div>').appendTo(@_overlay)
+            self.currentAlerts = []
 
 
         getTitle: () ->
@@ -83,6 +84,21 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 return parseFloat(interval) * defaultInterval
             else
                 throw "Invalid interval: " + interval
+
+
+        parseAlert: (expr, errorOnUndefined = false) ->
+            result = null
+            try
+                if expr? and expr != ''
+                    result = new AlertEvaluator(expr)
+            catch e
+                # Praser error
+                if errorOnUndefined
+                    new ui.Dialog(
+                        body: "Cannot compile: #{ e }"
+                    )
+                    throw "Invalid expression"
+            return result
 
 
         parseStats: (expr, errorOnUndefined = false) ->
@@ -1715,6 +1731,11 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 console.log("data")
                 console.log(data)
 
+            # Parse out alerts - note that this must be only during a load,
+            # NOT when the graph's perspective is changed.  This should only
+            # apply to the top division.
+            @_updateAlerts(data)
+
             # ---- Draw the graph ----
             tickHeight = 20
             
@@ -1778,6 +1799,36 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler) ->
                 [element, events] = holder
                 for ev in events
                     element.on(ev, null)
+
+
+        _updateAlerts: (data) ->
+            # data is a DataGroup object; we are interested in the subgroups.
+
+            # Raises an error if the alert is invalid
+            alertEval = @parseAlert(@config.alert, true)
+            lastAlerts = @currentAlerts
+            @currentAlerts = []
+            if alertEval != null
+                addDataGroup = (dg, isSubgroup = true) =>
+                    values = dg.getGraphPoints()
+                    curVal = values[values.length - 1].y
+                    alertInputs = { currentValue: curVal }
+                    if alertEval.eval(alertInputs)
+                        title = @config.title
+                        if isSubgroup
+                            title += " - #{ dg.title }"
+                        @currentAlerts.push(
+                                "#{title} (#{ @_formatValue(curVal) })")
+
+                if @config.groups.length == 0
+                    # Not subdivided
+                    addDataGroup(data, false)
+                else
+                    for subgroupId, subgroup of data.subgroups
+                        addDataGroup(subgroup)
+
+            if not $.compareObjs(@currentAlerts, lastAlerts)
+                @dashboard.app.alertsChanged()
 
 
     return Graph
