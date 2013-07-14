@@ -9,6 +9,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
     graphColors = d3.scale.category20()
     
     class Graph extends ui.Base
+        GRAPH_POINT_DENSITY: 3 #px
+
         constructor: (config, dashboard) ->
             super('<div class="graph"></div>')
             self = this
@@ -36,8 +38,6 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 timeBasis: ''
                 # Seconds between auto refresh, or '' to use dashboard
                 autoRefresh: ''
-                # Points to display on the graph
-                graphPoints: 300
             if config
                 $.extend(self.config, config)
             self._autoRefreshTimeout = null
@@ -50,6 +50,14 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             self._loadingOverlay = $('<div class="graph-loading-overlay">
                     </div>').appendTo(@_overlay)
             self.currentAlerts = []
+
+            if config
+                # We want to trigger alerts immediately, regardless of the state
+                # of expand or collapse
+                @_requestData(
+                        (dataGroup) =>
+                            @_updateAlerts(dataGroup)
+                        true)
 
 
         getTitle: () ->
@@ -187,6 +195,11 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             else
                 self._autoRefreshNext = null
 
+            self._requestData (dataGroup) => self._drawGraph(dataGroup)
+
+
+        _requestData: (callback, forAlert = false) ->
+            self = @
             stats = self.parseStats(self.config.expr, true)
 
             # Get all groups from all stats
@@ -278,6 +291,11 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             smoothAmt = self.config.smoothOver
             if smoothAmt == ''
                 smoothAmt = @dashboard.getSmoothAmt()
+
+            if forAlert
+                # For alerts we just need the latest point, plus a small buffer
+                # to ensure there are no weird rounding situations.
+                timeFrom = timeTo - self.parseInterval(smoothAmt) * 0.3
             
             # Update _sanitize
             @_sanitize = false
@@ -289,9 +307,11 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             if @dashboard.getUtcDates()
                 @_utcDates = true
                 
+            # Note that we take off the smoothAmt from timeFrom so that we
+            # have the extra data we need to calculate values at the point
+            # corresponding to timeFrom
             requestBase =
-                timeFrom: Math.floor(timeFrom - 
-                        self.parseInterval(smoothAmt))
+                timeFrom: Math.floor(timeFrom - self.parseInterval(smoothAmt))
                 timeTo: Math.floor(timeTo)
                 
             requests = []
@@ -319,7 +339,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 makeNext()
             makeNext = () =>
                 if requests.length == 0
-                    self._onLoaded(loadedData, timeFrom, timeTo, 
+                    self._onLoaded(callback, loadedData, timeFrom, timeTo,
                             stats: stats, smoothAmt: smoothAmt)
                 else
                     r = requests.pop()
@@ -876,6 +896,104 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 .attr('y1', '0')
                 .attr('y2', '5')
                 .attr('stroke', 'black')
+
+
+        _drawGraph: (data) ->
+            # Called when entirely new data is available for the graph (in other
+            # words, for all the zoom graphs, this is called only once
+            # regardless of zooming around).
+            # data is the processed DataGroup aggregated from _onLoaded.
+
+            self = @
+
+            if @_blockAutoRefresh
+                # We probably don't actually want to commit the data...
+                @_createTitle(true)
+                @_display.children(':first').append(
+                        ' (New data loaded, waiting)')
+                origArgs = arguments
+                setTimeout(
+                        () => @_onLoaded.apply(@, origArgs)
+                        1000)
+                return
+
+            # Unbind d3 event listeners to prevent leaks...  Do this in a
+            # closure so that we forget entirely about last round's events
+            # to clean.
+            @_renderedEventsCleanup()
+
+            self._display.empty()
+            self._loadingOverlay.empty()
+
+            # For drawing the graph, we explicitly don't use self._overlay,
+            # since that gets overwritten if we need to auto-update as fast as
+            # we can.
+            loadedText = $('<div class="graph-render-overlay">
+                    Loaded, drawing graph</div>')
+            loadedText.appendTo(self._display)
+
+            # Set up next autorefresh
+            if self._autoRefreshNext != null
+                timeToGo = self._autoRefreshNext - (new Date().getTime() / 1000)
+                if timeToGo < 0
+                    timeToGo = 0
+
+                self._autoRefreshTimeout = setTimeout(
+                    () -> self._autoRefresh()
+                    timeToGo * 1000
+                )
+
+            # Parse out alerts - note that this must be only during a load,
+            # NOT when the graph's perspective is changed.  This should only
+            # apply to the top division.
+            @_updateAlerts(data)
+
+            # ---- Draw the graph ----
+            tickHeight = 20
+
+            # Render title_title =
+            _title = self._createTitle()
+            _title.bind 'click', () =>
+                cfg = $.extend({}, @config)
+                # Grab our time basis
+                cfg.timeBasis = @dashboard.getTimeBasis()
+                cfg.timeAmt = @dashboard.getTimeAmt()
+                g = new Graph(cfg, @dashboard)
+                page = $('<div class="graph-fullscreen"></div>')
+                page.append(g).appendTo('body')
+                g.update()
+                page.bind 'click', (e) =>
+                    if e.target == page[0]
+                        page.remove()
+
+            @_drawAxis
+                tickHeight: tickHeight
+                pointTimes: data.computeOptions.pointTimes
+                display: @_display
+
+            display = self._display
+            width = display.width()
+            height = display.height() - tickHeight - _title.height()
+
+            drawGraphArgs = [
+                data
+                @_display
+                height
+            ]
+            if @config.type == 'area-period'
+                drawGraphArgs.push('area-period')
+                @_drawGraph_zoom.apply(@, drawGraphArgs)
+            else if @config.type == 'area-zoom'
+                drawGraphArgs.push('area')
+                @_drawGraph_zoom.apply(@, drawGraphArgs)
+            else if @config.type == 'linear-zoom'
+                drawGraphArgs.push('linear')
+                @_drawGraph_zoom.apply(@, drawGraphArgs)
+            else
+                throw "Unknown graph type: " + @config.type
+
+            # Remove loaded message
+            loadedText.remove()
 
 
         _drawGraph_area: (dataSets, display, height) ->
@@ -1609,58 +1727,28 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             return hash
 
 
-        _onLoaded: (dataRaw, timeFrom, timeTo, options) ->
+        _onLoaded: (callback, dataRaw, timeFrom, timeTo, options) ->
+            # callback is where we pass the finished DataGroup.
             # timeTo is passed since it might be defined according to the 
             # request (timeFrom as well).  stats passed to avoid re-parsing.
             {stats, smoothAmt} = options
             self = this
 
-            if @_blockAutoRefresh
-                # We probably don't actually want to commit the data...
-                @_createTitle(true)
-                @_display.children(':first').append(
-                        ' (New data loaded, waiting)')
-                origArgs = arguments
-                setTimeout(
-                        () => @_onLoaded.apply(@, origArgs)
-                        1000)
-                return
-
-            # Unbind d3 event listeners to prevent leaks...  Do this in a
-            # closure so that we forget entirely about last round's events
-            # to clean.
-            @_renderedEventsCleanup()
-            
-            self._display.empty()
-            self._loadingOverlay.empty()
-
-            # For drawing the graph, we explicitly don't use self._overlay, 
-            # since that gets overwritten if we need to auto-update as fast as 
-            # we can.
-            loadedText = $('<div class="graph-render-overlay">
-                    Loaded, drawing graph</div>')
-            loadedText.appendTo(self._display)
-
-            # Set up next autorefresh
-            if self._autoRefreshNext != null
-                timeToGo = self._autoRefreshNext - (new Date().getTime() / 1000)
-                if timeToGo < 0
-                    timeToGo = 0
-
-                self._autoRefreshTimeout = setTimeout(
-                    () -> self._autoRefresh()
-                    timeToGo * 1000
-                )
-
             # Step 1 - Parse the data returned to us into datasets
             dataSetsIn = dataRaw.split(/\n/g)
             dataSetsRaw = []
+            actualDiff = null
             for dataSetIn in dataSetsIn
                 newSet = dataSetIn.split(/[,\|]/g)
                 if newSet.length < 4
                     # Empty / bad line
                     continue
                 dataSetsRaw.push(newSet)
+                setDiff = parseFloat(newSet[3])
+                if not actualDiff?
+                    actualDiff = setDiff
+                else
+                    actualDiff = Math.min(actualDiff, setDiff)
 
             # Step 2 - Group those datasets into uniform collections of points
             # aggregated into each group(s) bucket
@@ -1673,9 +1761,16 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             # with timestamps matching pointTimes
             pointTimes = []
             lastPoint = timeTo
-            pointDiff = ((timeTo - timeFrom) / 
-                    self.config.graphPoints)
-            for i in [0...self.config.graphPoints]
+            # Default to 10px width for graphs not on dom... fallback for
+            # alerts, shouldn't matter
+            myWidth = 10
+            if @is(':visible')
+                myWidth = @width()
+            graphPoints = 1 + Math.ceil(myWidth / @GRAPH_POINT_DENSITY)
+            pointDiff = ((timeTo - timeFrom) / graphPoints)
+            if pointDiff < actualDiff
+                pointDiff = actualDiff
+            while lastPoint > timeFrom
                 pointTimes.unshift(lastPoint)
                 lastPoint -= pointDiff
                     
@@ -1731,57 +1826,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 console.log("data")
                 console.log(data)
 
-            # Parse out alerts - note that this must be only during a load,
-            # NOT when the graph's perspective is changed.  This should only
-            # apply to the top division.
-            @_updateAlerts(data)
-
-            # ---- Draw the graph ----
-            tickHeight = 20
-            
-            # Render title_title =
-            _title = self._createTitle()
-            _title.bind 'click', () =>
-                cfg = $.extend({}, @config)
-                # Grab our time basis
-                cfg.timeBasis = @dashboard.getTimeBasis()
-                cfg.timeAmt = @dashboard.getTimeAmt()
-                g = new Graph(cfg, @dashboard)
-                page = $('<div class="graph-fullscreen"></div>')
-                page.append(g).appendTo('body')
-                g.update()
-                page.bind 'click', (e) =>
-                    if e.target == page[0]
-                        page.remove()
-
-            @_drawAxis
-                tickHeight: tickHeight
-                pointTimes: pointTimes
-                display: @_display
-
-            display = self._display
-            width = display.width()
-            height = display.height() - tickHeight - _title.height()
-
-            drawGraphArgs = [
-                data
-                @_display
-                height
-            ]
-            if @config.type == 'area-period'
-                drawGraphArgs.push('area-period')
-                @_drawGraph_zoom.apply(@, drawGraphArgs)
-            else if @config.type == 'area-zoom'
-                drawGraphArgs.push('area')
-                @_drawGraph_zoom.apply(@, drawGraphArgs)
-            else if @config.type == 'linear-zoom'
-                drawGraphArgs.push('linear')
-                @_drawGraph_zoom.apply(@, drawGraphArgs)
-            else
-                throw "Unknown graph type: " + @config.type
-
-            # Remove loaded message
-            loadedText.remove()
+            callback(data)
 
 
         _registerRenderedEvents: (element, events) ->
