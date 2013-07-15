@@ -185,7 +185,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             # Set up title and loading stuff
             self._createTitle(true)
             self._display.children(':first').append(
-                    ' (Loading data, please wait)')
+                    ' (<span class="load-percent">0</span>% data loaded)')
 
             # Set up next autorefresh
             autoRefresh = self._getAutoRefresh()
@@ -327,6 +327,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 i += batch
                 
             loadedData = null
+            countRequests = requests.length
 
             error = () =>
                 self._createTitle()
@@ -342,6 +343,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                     self._onLoaded(callback, loadedData, timeFrom, timeTo,
                             stats: stats, smoothAmt: smoothAmt)
                 else
+                    $('.load-percent', self._display).text(
+                            (100 * (1 - requests.length / countRequests))
+                                .toFixed(0))
                     r = requests.pop()
                     $.ajax('getData', {
                         type: 'POST'
