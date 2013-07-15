@@ -33,8 +33,8 @@ define [], () ->
             findGroup = /{([^}]*)}/g
             reString = (
                     '^' + path.replace(/\./g, '\\.')
-                            .replace(findDoubleStar, '.+')
-                            .replace(findStar, '.*')
+                            .replace(findDoubleStar, '.*')
+                            .replace(findStar, '[^\\.]*')
                             .replace(findGroup, '([^\\.]*)')
             )
             

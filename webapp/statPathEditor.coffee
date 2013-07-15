@@ -65,7 +65,11 @@ define ["cs!lib/ui", "cs!statPath", "css!statPathEditor"], (ui, StatPath) ->
             # Filter the stat path editor's availBlock according to what has
             # been typed.
             pathVal = @path.val()
-            if pathVal.lastIndexOf("*") != pathVal.length - 1
+            # If it ends in a single star, assume the user meant it so we're
+            # ok.  If it didn't end in a double star, it should, for searching
+            # purposes.
+            if (pathVal.lastIndexOf("**") != pathVal.length - 2 \
+                    and pathVal.lastIndexOf("*") != pathVal.length - 1)
                 pathVal += "*"
             re = StatPath.prototype.getRegexForPath(pathVal)
             if @_timer?
@@ -120,6 +124,7 @@ define ["cs!lib/ui", "cs!statPath", "css!statPathEditor"], (ui, StatPath) ->
             @availBlock = new ui.ListBox(multiple: true).appendTo(body)
             @availDouble = new ui.ListBox(multiple: true).insertAfter(
                     @availBlock).hide()
+            @availDouble.css('border': 'solid 1px #00f')
             @_availTimer = null
             @_updateAvailable()
             
@@ -254,7 +259,7 @@ define ["cs!lib/ui", "cs!statPath", "css!statPathEditor"], (ui, StatPath) ->
                     () =>
                         @availBlock.show()
                         @availDouble.hide()
-                    2000)
+                    4000)
             @availDouble.reset()
             @availBlock.hide()
 
