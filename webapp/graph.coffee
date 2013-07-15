@@ -141,7 +141,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                             # Probably parsing as they type, no need to raise
                             continue
                             
-                        statsFound.push(stat)
+                        if statsFound.indexOf(stat) < 0
+                            statsFound.push(stat)
                     else if v != null and typeof v == 'object'
                         recurse(v)
                         
