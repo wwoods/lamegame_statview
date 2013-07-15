@@ -339,13 +339,13 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                     loadedData += '\n' + data
                 makeNext()
             makeNext = () =>
+                $('.load-percent', self._display).text(
+                        (100 * (1 - requests.length / countRequests))
+                            .toFixed(0))
                 if requests.length == 0
                     self._onLoaded(callback, loadedData, timeFrom, timeTo,
                             stats: stats, smoothAmt: smoothAmt)
                 else
-                    $('.load-percent', self._display).text(
-                            (100 * (1 - requests.length / countRequests))
-                                .toFixed(0))
                     r = requests.pop()
                     $.ajax('getData', {
                         type: 'POST'
