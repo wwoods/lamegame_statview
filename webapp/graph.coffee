@@ -14,6 +14,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
         constructor: (config, dashboard) ->
             super('<div class="graph"></div>')
             self = this
+            self._currentRequest = 0
             self._statsController = ui.Base.fromDom('.stats-app')._statsController
 
             @_renderedEventsToClean = []
@@ -202,6 +203,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             self = @
             stats = self.parseStats(self.config.expr, true)
 
+            @_currentRequest += 1
+            thisRequest = @_currentRequest
+
             # Get all groups from all stats
             allGroups = {}
             for stat in stats
@@ -339,6 +343,10 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                     loadedData += '\n' + data
                 makeNext()
             makeNext = () =>
+                if @_currentRequest != thisRequest
+                    # Another request for data has started, we should abort
+                    return
+
                 $('.load-percent', self._display).text(
                         (100 * (1 - requests.length / countRequests))
                             .toFixed(0))
