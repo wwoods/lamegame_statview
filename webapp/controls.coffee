@@ -26,6 +26,10 @@ define [ 'cs!lib/ui', 'cs!alertEvaluator', 'css!controls' ], (ui) ->
                 if (@_content.offset().left + @_content.outerWidth() \
                         > $(window).width())
                     @_content.css(left: -@_content.outerWidth())
+
+                if @_content.offset().left < 0
+                    # Would be off left side of screen
+                    @_content.css(left: 0)
                     
                 ui.Shade.show(@_content, hide: () =>
                     @_graph.update @getOptions()
