@@ -171,12 +171,11 @@ define [ 'cs!lib/ui', 'cs!alertEvaluator', 'css!controls' ], (ui) ->
                 stats: @_statsFound
                 expr: @expr.val()
                 alert: @alert.val()
+                hideNonAlerted: @hideNonAlerted.prop('checked')
                 groups: groups
                 smoothOver: @smoother.val()
                 timeAmt: @timeDivAmt.val()
                 autoRefresh: ''
-            if @hideNonAlerted.prop('checked')
-                options.hideNonAlerted = true
             return options
                 
                 
