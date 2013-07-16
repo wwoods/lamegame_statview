@@ -297,10 +297,25 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             if smoothAmt == ''
                 smoothAmt = @dashboard.getSmoothAmt()
 
+            # For items with less smoothing than the time between their data
+            # points (usually unsmoothed stats logged every hour, for instance),
+            # we need a mechanism to say "get this much extra data in order to
+            # show me a value".  That's what extraTime is.  Its purpose is
+            # primarily for alerts.
+            extraTime = 0
+            if smoothAmt.indexOf('/') >= 0
+                parts = smoothAmt.split('/')
+                smoothAmt = parts[0].trim()
+                extraTime = parts[1].trim()
+
+            smoothAmt = self.parseInterval(smoothAmt)
+            extraTime = self.parseInterval(extraTime)
+
             if forAlert
                 # For alerts we just need the latest point, plus a small buffer
-                # to ensure there are no weird rounding situations.
-                timeFrom = timeTo - self.parseInterval(smoothAmt) * 0.3
+                # to ensure there are no weird rounding situations (smoothAmt
+                # in full is added later)
+                timeFrom = timeTo - smoothAmt * 0.3
             
             # Update _sanitize
             @_sanitize = false
@@ -316,7 +331,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             # have the extra data we need to calculate values at the point
             # corresponding to timeFrom
             requestBase =
-                timeFrom: Math.floor(timeFrom - self.parseInterval(smoothAmt))
+                timeFrom: Math.floor(timeFrom - smoothAmt - extraTime)
                 timeTo: Math.floor(timeTo)
                 
             requests = []
@@ -472,7 +487,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             # Note that philosophically we consider the time in each pointTimes
             # record to be from immediately after the last point time up to and
             # including the next pointTime.
-            smoothSecs = self.parseInterval(smoothAmt)
+            smoothSecs = smoothAmt
             # Keep track of originally requested smoothing so that constants
             # affect the post-aggregated result of equations
             origSmooth = smoothSecs
@@ -557,9 +572,6 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             # keep track of the number of stats in our range
             # nz - non-zero
             nzStatsInRange = 0
-            # Used for total to ensure that we average all points in the window
-            # correctly.
-            nzStatParts = 0
 
             for pointTime in pointTimes
                 # We're actually going to compute a moving sum of partial data
@@ -592,27 +604,19 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                                 if nzStatsInRange == 0
                                     movingTotal = 0.0
                     else if aggregateType == 'total'
-                        v = parseFloat(rawData[movingIndex])
-                        if timeLeft >= partLeft
-                            # Take off the whole rest of the point
-                            movingTotal -= (v *
-                                    partLeft / srcInterval)
+                        if timeLeft < partLeft
+                            # Do nothing, wait for whole point out to remove
+                            movingTime = newTail
+                        else
+                            v = parseFloat(rawData[movingIndex])
+                            movingTotal -= v
                             movingTime = movingTimeBase + srcInterval
                             movingTimeBase = movingTime
                             movingIndex += 1
-                            if v != 0
-                                nzStatParts -= partLeft / srcInterval
-                                nzStatsInRange -= 1
-                                if nzStatsInRange == 0
-                                    movingTotal = 0.0
-                                    nzStatParts = 0
-                        else
-                            # Take off part of the point and we're done
-                            movingTotal -= (v *
-                                    timeLeft / srcInterval)
-                            if v != 0
-                                nzStatParts -= timeLeft / srcInterval
-                            movingTime = newTail
+
+                            nzStatsInRange -= 1
+                            if nzStatsInRange == 0
+                                movingTotal = 0.0
 
                 while srcIndex < rawData.length and srcTime < pointTime
                     # Moving summation
@@ -637,25 +641,18 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                             srcTime = pointTime
                     else if aggregateType == 'total'
                         # First instance of this point entering our range?
-                        v = parseFloat(rawData[srcIndex])
-                        if srcTime == srcTimeBase and v != 0
+                        if srcTime == srcTimeBase
+                            # First viewing of point, add it
+                            v = parseFloat(rawData[srcIndex])
+                            movingTotal += v
                             nzStatsInRange += 1
                             
+                        # Are we going to a new point?
                         if timeLeft >= partLeft
-                            # Rest of the point!
-                            movingTotal += (v *
-                                    partLeft / srcInterval)
-                            if v != 0
-                                nzStatParts += partLeft / srcInterval
                             srcTime = srcTimeBase + srcInterval
                             srcTimeBase = srcTime
                             srcIndex += 1
                         else
-                            # Partial point and done
-                            movingTotal += (v *
-                                    timeLeft / srcInterval)
-                            if v != 0
-                                nzStatParts += timeLeft / srcInterval
                             srcTime = pointTime
 
                 # Now, add!
@@ -670,8 +667,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 else if aggregateType == 'total'
                     # These are set values, so adjust smoothing according to
                     # the srcInterval
-                    if nzStatParts > 0
-                        values.push(movingTotal / nzStatParts)
+                    if nzStatsInRange > 0
+                        values.push(movingTotal / nzStatsInRange)
                     else
                         values.push(0)
                 else
@@ -1785,6 +1782,10 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                     actualDiff = setDiff
                 else
                     actualDiff = Math.min(actualDiff, setDiff)
+
+            # Ensure our interval is valid (contains the time for one point)
+            if timeTo - timeFrom < actualDiff
+                timeFrom = timeTo - actualDiff
 
             # Step 2 - Group those datasets into uniform collections of points
             # aggregated into each group(s) bucket
