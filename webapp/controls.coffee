@@ -12,7 +12,7 @@ define [ 'cs!lib/ui', 'cs!alertEvaluator', 'css!controls' ], (ui) ->
             @_content = $('<div class="controls-content"></div>')
             @append(@_content)
 
-            @bind('click mousedown', (e) =>
+            @_content.bind('click mousedown', (e) =>
                 # Stop it from affecting graph, but do let the default action
                 # happen for e.g. inputs
                 e.stopPropagation();
