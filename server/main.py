@@ -167,6 +167,20 @@ class MainRoot(object):
         return json.dumps(dict(ok = True))
 
 
+    @cherrypy.expose
+    @cherrypy.config(**{ 'response.headers.Content-Type': 'application/json' })
+    def setAliases(self, aliases):
+        if self._aliasStorage is None:
+            return json.dumps(dict(error = "Can't save without storage"))
+
+        aliases = json.loads(aliases)
+        for k, v in aliases.iteritems():
+            dd = dict(_id = k, aliases = v)
+            self._aliasStorage.save(dd)
+
+        return json.dumps(dict(ok = True))
+
+
     def _getAliases(self):
         """Return all aliases as [ { id: group, aliases: { from: to } } ]
         """
