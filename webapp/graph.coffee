@@ -1896,10 +1896,14 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                     alertInputs = { currentValue: curVal }
                     if alertEval.eval(alertInputs)
                         title = @config.title
+                        subTitle = null
                         if subgroupKey?
-                            title += " - #{ dg.title }"
-                        @currentAlerts.push(
-                                "#{title} (#{ @_formatValue(curVal) })")
+                            subTitle = dg.title
+                        @currentAlerts.push({
+                                graph: @config.title,
+                                title: subTitle,
+                                value: curVal,
+                                formattedValue: @_formatValue(curVal) })
 
                         dg.hasAlert = true
                     else if hideNonAlerted and subgroupKey?

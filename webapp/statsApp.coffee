@@ -381,7 +381,9 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                 return
 
             allAlerts = []
-            for g in @dashboard.getGraphs()
+            for g, i in @dashboard.getGraphs()
+                for ca in g.currentAlerts
+                    ca.order = i
                 allAlerts.push.apply(allAlerts, g.currentAlerts)
             @alertsDisplay.setAlerts(allAlerts)
 

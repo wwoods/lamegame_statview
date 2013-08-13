@@ -11,9 +11,19 @@ define [ "cs!lib/ui", "css!alertsDisplay" ], (ui) ->
             if $.compareObjs(alerts, @_lastAlerts)
                 return
 
+            alerts.sort (a, b) ->
+                r1 = a.order - b.order
+                if r1 != 0
+                    return r1
+                return b.value - a.value
+
             @empty()
             for a in alerts
-                $('<div>').text(a).appendTo(@)
+                title = a.graph
+                if a.title?
+                    title += " - #{ a.title }"
+                text = "#{ title } (#{ a.formattedValue })"
+                $('<div>').text(text).appendTo(@)
 
             wasOk = @hasClass('ok')
             if alerts.length == 0
