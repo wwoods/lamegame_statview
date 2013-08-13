@@ -346,17 +346,14 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 requests.push(request)
                 i += batch
                 
-            loadedData = null
+            loadedData = []
             countRequests = requests.length
 
             error = () =>
                 self._createTitle()
                 self._display.children().append(' (Failed to load)')
             gotNext = (data) =>
-                if not loadedData?
-                    loadedData = data
-                else
-                    loadedData += '\n' + data
+                loadedData.push(data)
                 makeNext()
             makeNext = () =>
                 if @_currentRequest != thisRequest
@@ -1760,7 +1757,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             return hash
 
 
-        _onLoaded: (callback, dataRaw, timeFrom, timeTo, options) ->
+        _onLoaded: (callback, responsesRaw, timeFrom, timeTo, options) ->
             # callback is where we pass the finished DataGroup.
             # timeTo is passed since it might be defined according to the 
             # request (timeFrom as well).  stats passed to avoid re-parsing.
@@ -1768,20 +1765,21 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             self = this
 
             # Step 1 - Parse the data returned to us into datasets
-            dataSetsIn = dataRaw.split(/\n/g)
             dataSetsRaw = []
-            actualDiff = null
-            for dataSetIn in dataSetsIn
-                newSet = dataSetIn.split(/[,\|]/g)
-                if newSet.length < 4
-                    # Empty / bad line
-                    continue
-                dataSetsRaw.push(newSet)
-                setDiff = parseFloat(newSet[3])
-                if not actualDiff?
-                    actualDiff = setDiff
-                else
-                    actualDiff = Math.min(actualDiff, setDiff)
+            for response in responsesRaw
+                dataSetsIn = response.split(/\n/g)
+                actualDiff = null
+                for dataSetIn in dataSetsIn
+                    newSet = dataSetIn.split(/[,\|]/g)
+                    if newSet.length < 4
+                        # Empty / bad line
+                        continue
+                    dataSetsRaw.push(newSet)
+                    setDiff = parseFloat(newSet[3])
+                    if not actualDiff?
+                        actualDiff = setDiff
+                    else
+                        actualDiff = Math.min(actualDiff, setDiff)
 
             # Ensure our interval is valid (contains the time for one point)
             if timeTo - timeFrom < actualDiff
