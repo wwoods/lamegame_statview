@@ -943,7 +943,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                         ' (New data loaded, waiting)')
                 origArgs = arguments
                 setTimeout(
-                        () => @_onLoaded.apply(@, origArgs)
+                        () => @_drawGraph.apply(@, origArgs)
                         1000)
                 return
 
@@ -1734,6 +1734,18 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             g += (255 - g) * 0.3
             b += (255 - b) * 0.3
             return @_getColorHex(r, g, b)
+
+
+        _getRawSetsFromResponse: (response) ->
+            r = response.split(/\n/g)
+            result = []
+            for line in r
+                splitSet = line.split(/[,\|]/g)
+                if splitSet.length < 4
+                    # Empty / bad line
+                    continue
+                result.push(splitSet)
+            return result
             
             
         _getTipSwatch: (name) ->
@@ -1764,22 +1776,15 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             {stats, smoothAmt} = options
             self = this
 
-            # Step 1 - Parse the data returned to us into datasets
-            dataSetsRaw = []
-            for response in responsesRaw
-                dataSetsIn = response.split(/\n/g)
-                actualDiff = null
-                for dataSetIn in dataSetsIn
-                    newSet = dataSetIn.split(/[,\|]/g)
-                    if newSet.length < 4
-                        # Empty / bad line
-                        continue
-                    dataSetsRaw.push(newSet)
-                    setDiff = parseFloat(newSet[3])
-                    if not actualDiff?
-                        actualDiff = setDiff
-                    else
-                        actualDiff = Math.min(actualDiff, setDiff)
+            # Step 1 - Keep memory usage down by trusting the first response
+            # to contain all valid time data.  Then we just stream the others
+            actualDiff = null
+            for newSet in @_getRawSetsFromResponse(responsesRaw[0])
+                setDiff = parseFloat(newSet[3])
+                if not actualDiff?
+                    actualDiff = setDiff
+                else
+                    actualDiff = Math.min(actualDiff, setDiff)
 
             # Ensure our interval is valid (contains the time for one point)
             if timeTo - timeFrom < actualDiff
@@ -1824,38 +1829,42 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 pointTimes: pointTimes
                 statsController: @_statsController
 
+            # Build actual data sets by popping off response sets as we go along
             data = new DataGroup(self.config.title, calculateOptions)
-            for dataSet in dataSetsRaw
-                # For each of the returned data sets, nest it in our "totals"
-                # data set according to the groups we've been asked to divide
-                # across
-                dataSetData = self._aggregateSourceData(dataSet, pointTimes,
-                        timeFrom, smoothAmt)
-                if not dataSetData
-                    continue
-                dataSetName = dataSetData.stat.name
-                myGroups = self.config.groups.slice()
-                dataOutput = data
-                while true
-                    # Add set to current DataGroup
-                    if not (dataSetName of dataOutput.values)
-                        dataOutput.values[dataSetName] = []
-                    dataOutput.values[dataSetName].push(dataSetData)
+            while responsesRaw.length > 0
+                response = responsesRaw.shift()
+                for dataSet in @_getRawSetsFromResponse(response)
+                    # For each of the returned data sets, nest it in our
+                    # "totals" data set according to the groups we've been
+                    # asked to divide across
+                    dataSetData = self._aggregateSourceData(dataSet, pointTimes,
+                            timeFrom, smoothAmt)
+                    if not dataSetData
+                        continue
+                    dataSetName = dataSetData.stat.name
+                    myGroups = self.config.groups.slice()
+                    dataOutput = data
+                    while true
+                        # Add set to current DataGroup
+                        if not (dataSetName of dataOutput.values)
+                            dataOutput.values[dataSetName] = []
+                        dataOutput.values[dataSetName].push(dataSetData)
 
-                    # Look for the next group that needs the data
-                    next = myGroups.shift()
-                    if next == undefined
-                        # No more groups, all done
-                        break
-                    nextValue = dataSetData.groups[next[0]]
-                    if nextValue == undefined
-                        # This stat doesn't have our next group, so stop here
-                        break
-                    if not (nextValue of dataOutput.subgroups)
-                        nextTitle = "#{ next[0] }: #{ nextValue }"
-                        dataOutput.subgroups[nextValue] = new DataGroup(
-                                nextTitle, calculateOptions)
-                    dataOutput = dataOutput.subgroups[nextValue]
+                        # Look for the next group that needs the data
+                        next = myGroups.shift()
+                        if next == undefined
+                            # No more groups, all done
+                            break
+                        nextValue = dataSetData.groups[next[0]]
+                        if nextValue == undefined
+                            # This stat doesn't have our next group, so stop
+                            # here
+                            break
+                        if not (nextValue of dataOutput.subgroups)
+                            nextTitle = "#{ next[0] }: #{ nextValue }"
+                            dataOutput.subgroups[nextValue] = new DataGroup(
+                                    nextTitle, calculateOptions)
+                        dataOutput = dataOutput.subgroups[nextValue]
                     
             if window.debug
                 console.log("data")
