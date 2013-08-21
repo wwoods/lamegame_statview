@@ -445,8 +445,13 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                                 nextValue = null
 
                         if lastValue == null
-                            # Haven't seen any values, use nextValue
-                            rawData[i] = nextValue
+                            # Haven't seen any values, use 0.  Note that the
+                            # slash syntax should be used for stats logged only
+                            # periodically in order to prevent left-side zeroes.
+                            # (That is, for individual graph,
+                            # smoothing = "/6 hours" if the stat is logged every
+                            # six hours)
+                            rawData[i] = 0.0
                         else if nextValue == null
                             rawData[i] = lastValue
                         else
