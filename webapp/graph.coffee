@@ -202,7 +202,12 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
 
         _requestData: (callback, forAlert = false) ->
             self = @
-            stats = self.parseStats(self.config.expr, true)
+            try
+                stats = self.parseStats(self.config.expr, true)
+            catch e
+                self._createTitle()
+                self._display.children().append(" (error; edit to see)")
+                return
 
             @_currentRequest += 1
             thisRequest = @_currentRequest

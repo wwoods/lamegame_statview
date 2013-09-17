@@ -32,7 +32,11 @@ define [ 'cs!lib/ui', 'cs!alertEvaluator', 'css!controls' ], (ui) ->
                     @_content.css(left: 0)
                     
                 ui.Shade.show(@_content, hide: () =>
-                    @_graph.update @getOptions()
+                    try
+                        @_graph.update @getOptions()
+                    catch e
+                        # Do nothing, user will get an error message
+                        null
                     @_content.hide()
                 )
             )
