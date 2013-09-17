@@ -78,9 +78,14 @@ define [ 'cs!lib/ui', 'cs!alertEvaluator', 'css!controls' ], (ui) ->
             @_content.append(@statsLb)
             @statsLb.delegate "option", "click", ->
                 # Not fat arrow, need this from event
-                self.expr.val(self.expr.val() + $(this).val())
-                self.expr.trigger('change')
-                self.expr.focus()
+                # Only add our value to self.expr if we are currently NOT a
+                # valid expression.  If we are a valid expression, appending
+                # the stat will make it invalid, meaning this is probably not
+                # what the user wanted.
+                if not self._graph.isValidExpr(self.expr.val())
+                    self.expr.val(self.expr.val() + $(this).val())
+                    self.expr.trigger('change')
+                    self.expr.focus()
 
             exprDiv = $('<div>Expression</div>').appendTo(@_content)
             @_statsFound = []

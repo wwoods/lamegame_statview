@@ -110,6 +110,17 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             return result
 
 
+        isValidExpr: (expr) ->
+            ### Return true if expr is a valid graph expression, false
+            otherwise.
+            ###
+            try
+                evaler.compile(expr)
+                return true
+            catch e
+                return false
+
+
         parseStats: (expr, errorOnUndefined = false) ->
             ### Parse an expression for stats, return array of stats used
             ###
