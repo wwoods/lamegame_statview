@@ -1598,6 +1598,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             # Draw the proportional bit
             normWidth = '2px'
             selWidth = '5px'
+            # We want a space buffer so that lines that stay at max value aren't
+            # invisible.
+            drawHeight = height - parseInt(normWidth)
             
             # Set up mouse handler here since we use it for both positive 
             # and negative
@@ -1623,11 +1626,11 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             linep = d3.svg.line()
                 .interpolate('monotone')
                 .x((d) => (d.x - xmin) * width / (xmax - xmin))
-                .y((d) => height - d.ynormp * height)
+                .y((d) => height - d.ynormp * drawHeight)
             linen = d3.svg.line()
                 .interpolate('monotone')
                 .x((d) => (d.x - xmin) * width / (xmax - xmin))
-                .y((d) => height - d.ynormn * height)
+                .y((d) => height - d.ynormn * drawHeight)
                 
             visData = detailVis.selectAll("path").data(subgroupSets).enter()
             
