@@ -331,7 +331,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 # For alerts we just need the latest point, plus a small buffer
                 # to ensure there are no weird rounding situations (smoothAmt
                 # in full is added later)
-                timeFrom = timeTo - smoothAmt * 0.3
+                timeFrom = timeTo - smoothAmt * 0.3 - extraTime
             
             # Update _sanitize
             @_sanitize = false
@@ -469,7 +469,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                             # six hours)
                             rawData[i] = 0.0
                         else if nextValue == null
-                            rawData[i] = lastValue
+                            rawData[i] = NaN
                         else
                             # Interpolate!
                             u = (i - lastValueI) / (nextValueI - lastValueI)
@@ -1070,6 +1070,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                     .x((d) -> (d.x - xmin) * width / (xmax - xmin))
                     .y0((d) -> height - d.y0 * height / useYmax)
                     .y1((d) -> height - (d.y + d.y0) * height / useYmax)
+                    .defined((d) -> !isNaN(d.y))
                 return area
 
 
@@ -1237,6 +1238,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                             .x((d) -> (d.x - xmin) * width / (xmax - xmin))
                             .y0(y0Get)
                             .y1((d) -> trendHeight)
+                            .defined((d) -> !isNaN(d.y))
                     )
                     .on("mousemove", (d) =>
                         tipDiv = $('<div class="graph-value-tooltip"></div>')
@@ -1355,6 +1357,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 .x((d) -> (d.x - xmin) * width / (xmax - xmin))
                 .y0((d) -> height - d.y0 * height)
                 .y1((d) -> height - (d.ynorm + d.y0) * height)
+                .defined((d) -> !isNaN(d.y))
             detailVis.selectAll("path")
                 .data(subgroupSets).enter()
                     .append("path")
@@ -1505,6 +1508,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 .x((d) -> (d.x - xmin) * width / (xmax - xmin))
                 .y0((d) -> height - 0*d.y0 * height)
                 .y1((d) -> height - (d.ynorm + 0*d.y0) * height)
+                .defined((d) -> !isNaN(d.y))
             detailVis.selectAll("path")
                 .data(reorderedSubGroups).enter()
                     .append("path")
@@ -1558,7 +1562,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             ymax = 0.0
             for i in [0...subgroupSets[0].length]
                 for ds in subgroupSets
-                    ymax = Math.max(ymax, Math.abs(ds[i].y))
+                    ay = Math.abs(ds[i].y)
+                    if !isNaN(ay)
+                        ymax = Math.max(ymax, ay)
                     
             # Do we need to clamp ymax?
             if @_sanitize
@@ -1638,10 +1644,12 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 .interpolate('monotone')
                 .x((d) => (d.x - xmin) * width / (xmax - xmin))
                 .y((d) => height - d.ynormp * drawHeight)
+                .defined((d) => !isNaN(d.y))
             linen = d3.svg.line()
                 .interpolate('monotone')
                 .x((d) => (d.x - xmin) * width / (xmax - xmin))
                 .y((d) => height - d.ynormn * drawHeight)
+                .defined((d) => d.y < 0)
                 
             visData = detailVis.selectAll("path").data(subgroupSets).enter()
             
@@ -1826,8 +1834,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             pointTimes = []
             lastPoint = timeTo
             # Default to 10px width for graphs not on dom... fallback for
-            # alerts, shouldn't matter
-            myWidth = 10
+            # alerts, shouldn't matter too much, except if it's low then we'll
+            # see "popping" when we expand a graph with failing alerts
+            myWidth = 200 * @GRAPH_POINT_DENSITY
             if @is(':visible')
                 myWidth = @width()
             graphPoints = 1 + Math.ceil(myWidth / @GRAPH_POINT_DENSITY)
@@ -1925,7 +1934,13 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 hideNonAlerted = @dashboard.getHideNonAlerted() or @config.hideNonAlerted
                 addDataGroup = (subgroupKey, dg) =>
                     values = dg.getGraphPoints()
-                    curVal = values[values.length - 1].y
+                    curVal = NaN
+                    i = values.length
+                    while i > 0
+                        i -= 1
+                        curVal = values[i].y
+                        if !isNaN(curVal)
+                            break
                     alertInputs = { currentValue: curVal }
                     if alertEval.eval(alertInputs)
                         title = @config.title

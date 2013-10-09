@@ -27,9 +27,10 @@ define [], () ->
             ymax = -1e35
             for pt in @
                 xmin = Math.min(pt.x, xmin)
-                ymin = Math.min(pt.y, ymin)
                 xmax = Math.max(pt.x, xmax)
-                ymax = Math.max(pt.y, ymax)
+                if !isNaN(pt.y)
+                    ymin = Math.min(pt.y, ymin)
+                    ymax = Math.max(pt.y, ymax)
             return {
                 xmin: xmin
                 xmax: xmax
