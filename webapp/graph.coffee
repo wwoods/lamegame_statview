@@ -331,7 +331,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 # For alerts we just need the latest point, plus a small buffer
                 # to ensure there are no weird rounding situations (smoothAmt
                 # in full is added later)
-                timeFrom = timeTo - smoothAmt * 0.3 - extraTime
+                timeFrom = timeTo - smoothAmt - extraTime
             
             # Update _sanitize
             @_sanitize = false
@@ -393,13 +393,19 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             makeNext()
 
 
-        _aggregateSourceData: (rawData, pointTimes, timeFrom, smoothAmt) ->
+        _aggregateSourceData: (rawData, pointTimes, timeFrom, smoothAmt,
+                stats) ->
             # Searches our statsController's stats for the stat matching
             # rawLine, and aggregates it appropriately according to the stat
             # type
             #
             # rawData - As per graphite's "raw" output:
             # statName, timestampFirst, timestampDelta, data...
+            #
+            # pointTimes - Buckets to aggregate into
+            # timeFrom - Timestamp (seconds) first requested
+            # smoothAmt - Seconds "width" for each bucket
+            # stats - List of stats used in our expression that were requested.
             #
             # Returns a dict:
             # { stat: statName, groups: { group : value },
@@ -408,21 +414,21 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
 
             matchStat = null
             matchGroups = null
-            for statName of self._statsController.stats
-                stat = self._statsController.stats[statName]
+            for stat in stats
                 match = stat.matchPath(rawData[0])
-                if match != null
+                if match != null and (matchStat == null \
+                        or matchStat.score < stat.score)
                     matchStat = stat
                     matchGroups = match
-                    # Convert aliased values
-                    for group, val of matchGroups
-                        groupAliases = self._statsController.aliases[group]
-                        if groupAliases and val of groupAliases
-                            matchGroups[group] = groupAliases[val]
-                    break
 
             if matchStat == null
                 throw "Could not match stat: " + rawData[0]
+
+            # Convert aliased values
+            for group, val of matchGroups
+                groupAliases = self._statsController.aliases[group]
+                if groupAliases and val of groupAliases
+                    matchGroups[group] = groupAliases[val]
 
             result = { stat: matchStat, groups: matchGroups }
             values = []
@@ -1871,7 +1877,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                     # "totals" data set according to the groups we've been
                     # asked to divide across
                     dataSetData = self._aggregateSourceData(dataSet, pointTimes,
-                            timeFrom, smoothAmt)
+                            timeFrom, smoothAmt, stats)
                     if not dataSetData
                         continue
                     dataSetName = dataSetData.stat.name

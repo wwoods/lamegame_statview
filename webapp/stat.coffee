@@ -7,6 +7,7 @@ define [], (Stat) ->
             @path = params.path
             @pathRegex = params.pathRegex
             @type = params.type
+            @score = params.score
             if not @type?
                 @type = 'count'
                 if /-sample$/.test(@path)

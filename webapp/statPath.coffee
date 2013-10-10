@@ -20,6 +20,7 @@ define [], () ->
             # Calculate the score for our path; more specific chars means
             # a higher score
             @score = path.replace(/\*/g, '').replace(/{([^}]*)}/g, '').length
+            @statOptions.score = @score
 
 
         getRegexForPath: (path) ->
