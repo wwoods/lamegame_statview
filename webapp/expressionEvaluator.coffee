@@ -23,10 +23,16 @@ define ["expressionParser"], (parser) ->
         "forEach-sum": (e, n) ->
             subevals = e.splitByGroup(n.group)
             total = 0.0
+            allNaN = true
             for g, subeval of subevals
                 # Move the subeval up to our current point
                 subeval.dataPoint = e.dataPoint
-                total += subeval.v(n.expr)
+                val = subeval.v(n.expr)
+                if not isNaN(val)
+                    total += val
+                    allNaN = false
+            if allNaN
+                total = NaN
             return total
             
     getValueAsRegex = (v) ->
@@ -90,19 +96,26 @@ define ["expressionParser"], (parser) ->
                 # No data, return 0
                 return sv
                 
+            allNaN = true
             if stat.type == 'total-max'
                 sv = null
                 for q in @dataSets[s]
                     if not @testLimit(q, sLimits)
                         continue
                     val = q.values[@dataPoint]
-                    if sv == null or sv < val
+                    if sv == null and not isNaN(val) or sv < val
                         sv = val
+                        allNaN = false
             else
                 for q in @dataSets[s]
                     if not @testLimit(q, sLimits)
                         continue
-                    sv += q.values[@dataPoint]
+                    val = q.values[@dataPoint]
+                    if not isNaN(val)
+                        sv += val
+                        allNaN = false
+            if allNaN
+                sv = NaN
             return sv
 
 

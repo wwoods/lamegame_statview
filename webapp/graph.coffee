@@ -1053,53 +1053,6 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             loadedText.remove()
 
 
-        _drawGraph_area: (dataSets, display, height) ->
-            width = display.width()
-            xmin = dataSets[0][0].x
-            xmax = dataSets[0][dataSets[0].length - 1].x
-
-            # d3.layout.stack() adds the "y0" property to dataSets, and stacks 
-            # them
-            stacks = d3.layout.stack().offset('wiggle')(dataSets)
-            ymax = Math.max.apply(Math, stacks.map(
-                (a) ->
-                    a.reduce(
-                        (last, d) ->
-                            Math.max(d.y + d.y0, last)
-                        0
-                    )
-            ))
-
-            getAreaMethod = () ->
-                useYmax = ymax
-                area = d3.svg.area()
-                    .x((d) -> (d.x - xmin) * width / (xmax - xmin))
-                    .y0((d) -> height - d.y0 * height / useYmax)
-                    .y1((d) -> height - (d.y + d.y0) * height / useYmax)
-                    .defined((d) -> !isNaN(d.y))
-                return area
-
-
-            # First render
-            vis = d3.select(display[0]).append('svg')
-            vis.attr('width', width).attr('height', height)
-            self = @
-            vis.selectAll("path")
-                .data(stacks).enter()
-                    .append("path")
-                    .style("fill", (d) -> graphColors(d.title))
-                    .attr("d", getAreaMethod())
-                    .on("mousemove", (d) =>
-                        val = @_eventInterp(d)
-                        valStr = @_formatValue(val)
-                        ui.Tooltip.show(d3.event, d.title + ': ' + valStr)
-                    )
-                    .on("mouseout", () -> ui.Tooltip.hide())
-
-            # Circular reference cleanup
-            @_registerRenderedEvents(vis, [ "mousemove", "mouseout" ])
-
-
         _drawGraph_zoom: (data, display, height, zoomType) ->
             ### Draw an area_zoom graph of data in display with height.
             
@@ -1301,7 +1254,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 # Calculate the total "effect" here...
                 absVal = 0
                 for ds in subgroupSets
-                    absVal += Math.abs(ds[i].y)
+                    av = Math.abs(ds[i].y)
+                    if not isNaN(av)
+                        absVal += av
                 absCombined[i] = absVal
                 absCombinedMax = Math.max(absCombinedMax, absVal)
                 
@@ -1322,14 +1277,15 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 for ds in subgroupSets
                     # If this layer is imperceptible, set ynorm to 0
                     av = Math.abs(ds[i].y)
-                    if ds[i].y == 0 or absCombined[i] < 1e-6
+                    if av == 0 or absCombined[i] < 1e-6 or isNaN(av)
                         ds[i].ynorm = 0
                     else
-                        ds[i].ynorm = Math.abs(ds[i].y) / absCombined[i]
+                        ds[i].ynorm = av / absCombined[i]
 
             # d3.layout.stack() adds the "y0" property to dataSets, and 
             # stacks them
-            stacksGen = d3.layout.stack().offset('zero')
+            stacksGen = d3.layout.stack()
+                .offset('zero')
                 .y((d) -> d.ynorm)
                 .out (d, y0, y) ->
                     d.y0 = y0
