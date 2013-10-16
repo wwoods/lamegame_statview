@@ -95,27 +95,34 @@ define ["expressionParser"], (parser) ->
             if not @dataSets[s]?
                 # No data, return 0
                 return sv
+
+            goodValues = []
+            for q in @dataSets[s]
+                if not @testLimit(q, sLimits)
+                    continue
+                val = q.values[@dataPoint]
+                if isNaN(val)
+                    continue
+                goodValues.push(val)
                 
-            allNaN = true
+            if goodValues.length == 0
+                # No values passing filters, return NaN
+                return NaN
+
             if stat.type == 'total-max'
                 sv = null
-                for q in @dataSets[s]
-                    if not @testLimit(q, sLimits)
-                        continue
-                    val = q.values[@dataPoint]
-                    if sv == null and not isNaN(val) or sv < val
+                for val in goodValues
+                    if sv == null or sv < val
                         sv = val
-                        allNaN = false
+            else if stat.type == 'total-avg'
+                svCount = 0
+                for val in goodValues
+                    sv += val
+                    svCount += 1
+                sv /= svCount
             else
-                for q in @dataSets[s]
-                    if not @testLimit(q, sLimits)
-                        continue
-                    val = q.values[@dataPoint]
-                    if not isNaN(val)
-                        sv += val
-                        allNaN = false
-            if allNaN
-                sv = NaN
+                for val in goodValues
+                    sv += val
             return sv
 
 

@@ -25,8 +25,9 @@ define ["cs!lib/ui", "cs!statPath", "css!statPathEditor"], (ui, StatPath) ->
             @type = new ui.ListBox().appendTo(@)
             @type.addOption("count", "Counter")
             @type.addOption("count-fuzzy", "Fuzzy Counter")
-            @type.addOption("total", "Sample")
-            @type.addOption("total-max", "Sampled Max")
+            @type.addOption("total", "Sample (aggregate as Sum)")
+            @type.addOption("total-max", "Sample (aggregate as Max)")
+            @type.addOption("total-avg", "Sample (aggregate as Average)")
             if pathDef.type?
                 @type.val(pathDef.type)
             @type.bind("keyup change", () => @update())

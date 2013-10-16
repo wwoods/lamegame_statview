@@ -1,7 +1,7 @@
 define [], (Stat) ->
     class Stat
         constructor: (params) ->
-            # type = 'count' or 'total' or 'total-max'
+            # type = 'count' or 'total' or 'total-max' or 'total-avg'
             @name = params.name
             @groups = params.groups
             @path = params.path

@@ -435,7 +435,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             result.values = values
             
             aggregateType = 'count'
-            if stat.type == 'total' or stat.type == 'total-max'
+            if stat.type == 'total' or stat.type.indexOf('total-') == 0
                 aggregateType = 'total'
             else if stat.type == 'count-fuzzy'
                 aggregateType = 'count-fuzzy'
