@@ -61,6 +61,10 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                         true)
 
 
+        getHideNonAlerted: () ->
+            return @dashboard.getHideNonAlerted() or @config.hideNonAlerted
+
+
         getTitle: () ->
             """Called when collapsed; when expanded, update() is called."""
             return @config.title
@@ -1210,10 +1214,17 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                         subtips = []
                         for key, ds of layerData.subgroups
                             r = @_eventInterp(ds.getGraphPoints())
-                            if Math.abs(r) < (ymax - ymin) / height / 2 and
-                                    Math.abs(r) < 0.001
-                                # Insignificant value
+                            if isNaN(r)
+                                # Undefined value (no data)
                                 continue
+                            if not @getHideNonAlerted()
+                                # If we were hiding non alerted, then anything
+                                # that we're showing, we should show the alert
+                                # for.
+                                if (Math.abs(r) < (ymax - ymin) / height / 2 \
+                                        and Math.abs(r) < 0.001)
+                                    # Insignificant value
+                                    continue
                             valStr = @_formatValue(r)
                             valLine = $('<div></div>')
                             valLine.append(ds.title + ': ')
@@ -1893,7 +1904,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             lastAlerts = @currentAlerts
             @currentAlerts = []
             if alertEval != null
-                hideNonAlerted = @dashboard.getHideNonAlerted() or @config.hideNonAlerted
+                hideNonAlerted = @getHideNonAlerted()
                 addDataGroup = (subgroupKey, dg) =>
                     values = dg.getGraphPoints()
                     curVal = NaN
