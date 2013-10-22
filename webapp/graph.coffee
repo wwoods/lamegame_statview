@@ -314,8 +314,6 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             timeFrom = timeTo - self.parseInterval(timeAmt)
             
             smoothAmt = self.config.smoothOver
-            if smoothAmt == ''
-                smoothAmt = @dashboard.getSmoothAmt()
 
             # For items with less smoothing than the time between their data
             # points (usually unsmoothed stats logged every hour, for instance),
@@ -327,6 +325,9 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 parts = smoothAmt.split('/')
                 smoothAmt = parts[0].trim()
                 extraTime = parts[1].trim()
+
+            if smoothAmt == ''
+                smoothAmt = @dashboard.getSmoothAmt()
 
             smoothAmt = self.parseInterval(smoothAmt)
             extraTime = self.parseInterval(extraTime)
