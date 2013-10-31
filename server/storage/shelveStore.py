@@ -18,6 +18,13 @@ class ShelveCollection(BaseCollection):
         
     def find(self):
         return self._shelf.itervalues()
+
+
+    def findRange(self, a, b):
+        """Returns an iterator of all documents between [a, b), exclusive"""
+        for k, v in self._shelf.iteritems():
+            if a <= k < b:
+                yield v
     
     
     def save(self, doc):

@@ -1,4 +1,4 @@
-define [ 'cs!statPath', 'cs!stat' ], (StatPath, Stat) ->
+define [ 'cs!statPath', 'cs!stat', 'cs!eventsController' ], (StatPath, Stat, EventsController) ->
     class StatsController
         constructor: (availableStats) ->
             @availableStats = availableStats
@@ -9,6 +9,7 @@ define [ 'cs!statPath', 'cs!stat' ], (StatPath, Stat) ->
             @groups = {}
             @groups_doc = """{ name: [ sorted possible values ] }"""
             @statPaths = []
+            @events = new EventsController()
 
 
         parseStats: (paths) ->

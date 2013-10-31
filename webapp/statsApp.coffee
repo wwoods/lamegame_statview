@@ -409,7 +409,6 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                 aliases: @_aliases
                 onChange: () =>
                     @_statsController.setAliases(@_aliases)
-
             
             
         editPaths: () ->

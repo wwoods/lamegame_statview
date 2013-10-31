@@ -29,6 +29,11 @@ class MongoCollection(BaseCollection):
         
     def find(self):
         return self._coll.find()
+
+
+    def findRange(self, a, b):
+        """Returns an iterator of all documents between [a, b), exclusive"""
+        return self._coll.find({ '_id': { '$gte': a, '$lt': b } })
     
     
     def save(self, doc):

@@ -83,3 +83,20 @@
     vertical-align: bottom;
 }
 
+.graph-event-tooltip {
+}
+
+.graph-event-dialog {
+    margin-bottom: -0.5em;
+}
+
+.graph-event-dialog-event {
+    border: solid 1px #000;
+    padding: 2px;
+    margin-bottom: 0.5em;
+}
+
+.graph-event-dialog-event-caption {
+    font-weight: bold;
+}
+

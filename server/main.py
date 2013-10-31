@@ -1,8 +1,9 @@
 
 import cherrypy
 import json
-import re
 import os
+import random
+import re
 import time
 
 import graphiteSource
@@ -47,7 +48,7 @@ class MainRoot(object):
 
         # Do we have storage?
         for storeType, varShorthand in [ ('dashboards', 'dash'),
-                ('paths', 'path'), ('aliases', 'alias') ]:
+                ('paths', 'path'), ('aliases', 'alias'), ('events', 'event') ]:
             store = None
             if cherrypy.app.get('storage', {}).get(storeType) is not None:
                 url = cherrypy.app['storage'][storeType]
@@ -69,6 +70,36 @@ class MainRoot(object):
     @cherrypy.expose
     def index(self):
         return cherrypy.lib.static.serve_file(_DIR + '/webapp/app.html')
+
+
+    @cherrypy.expose
+    @cherrypy.config(**{ 'response.headers.Content-Type': 'application/json' })
+    def addEvent(self, event):
+        """Events should have:
+        caption - string, shorthand displayed on mouse over
+        content - html text when event is opened
+        time - Time, in seconds (including decimal milliseconds) of event.  If
+                not supplied, server's now() time will be used.
+        """
+        if self._eventStorage is None:
+            return json.dumps(dict(error = "Can't save without event storage"))
+
+        eventObject = json.loads(event)
+        errors = []
+        if 'caption' not in eventObject:
+            errors.append("Needs caption")
+        if 'content' not in eventObject:
+            eventObject['content'] = None
+        if 'time' not in eventObject:
+            eventObject['time'] = time.time()
+        if errors:
+            return json.dumps(dict(error = ', '.join(errors)))
+        # as of 2013-10-31, the seconds column for time is 10 digits long.  It
+        # will be 11 digits in 2286.  ...I personally am OK with this for now.
+        eventObject['_id'] = "{}-{}".format(str(eventObject['time']),
+                random.random())
+        self._eventStorage.save(eventObject)
+        return json.dumps({ "ok": True, "eventId": eventObject['_id'] })
     
     
     @cherrypy.expose
@@ -105,6 +136,18 @@ class MainRoot(object):
             # Already encoded
             return r
         return json.dumps(r)
+
+
+    @cherrypy.expose
+    @cherrypy.config(**{ 'response.headers.Content-Type': 'application/json' })
+    def getEvents(self, timeFrom, timeTo):
+        """Given timeFrom and timeTo, return (sorted) list of events between the
+        two, exclusive on timeTo."""
+        if self._eventStorage is None:
+            return json.dumps(dict(error = "Can't load events without storage"))
+
+        return json.dumps({ 'events': sorted(self._eventStorage.findRange(
+                timeFrom, timeTo), key = lambda m: m['_id']) })
 
 
     @cherrypy.expose

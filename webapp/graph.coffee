@@ -395,7 +395,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                         success: gotNext
                         error: error
                     })
-            makeNext()
+
+            @_statsController.events.loadEvents(timeFrom, timeTo, makeNext)
 
 
         _aggregateSourceData: (rawData, pointTimes, timeFrom, smoothAmt,
@@ -791,6 +792,34 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             if @_missingFilter
                 title.append('<span style="color:#f00;"> missed by filter</span>')
             return title
+
+
+        _bucketizeEvents: (events, xmin, xmax, width, radius) ->
+            # Given events spread from xmin to xmax over width pixels with
+            # event dots of radius, bucketize!  Also fills in "x" property on
+            # buckets.
+            buckets = []
+            pixPerDiff = width / (xmax - xmin)
+            newBucket = (e) ->
+                b = { time: e.time, events: [ e ] }
+                buckets.push(b)
+            addToBucket = (e) ->
+                b = buckets[buckets.length - 1]
+                if (e.time - b.time) * pixPerDiff > radius * 2
+                    return false
+                b.time = b.time * b.events.length + e.time
+                b.events.push(e)
+                b.time /= b.events.length
+                return true
+
+            for e in events
+                if buckets.length == 0
+                    newBucket(e)
+                else if not addToBucket(e)
+                    newBucket(e)
+            for b in buckets
+                b.x = (b.time - xmin) * width / (xmax - xmin)
+            return buckets
         
         
         _drawAxis: (options) ->
@@ -807,6 +836,11 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
             intervalMax = xmax
             intervalLength = 60
             ticks = width / 40
+            eventRadius = 8
+
+            events = @_statsController.events.getEvents(xmin, xmax)
+            eventBuckets = @_bucketizeEvents(events, xmin, xmax, width,
+                    eventRadius)
 
             # Initially, intervalLength is minutes
             denoms = [
@@ -942,9 +976,11 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 position: 'absolute'
                 bottom: 0
                 left: 0
+
             axis
                 .attr('width', width).attr('height', tickHeight)
-            axisContext = axis.selectAll()
+
+            axisContext = axis.selectAll("ticks")
                 .data(intervals)
                 .enter()
             axisContext.append('text')
@@ -958,6 +994,47 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 .attr('y1', '0')
                 .attr('y2', '5')
                 .attr('stroke', 'black')
+
+            getEventBucketColor = (d) =>
+                red = Math.floor(255 - 127 / d.events.length)
+                return '#' + red.toString(16) + '80ff'
+            eContext = axis.selectAll("events")
+                .data(eventBuckets)
+                .enter()
+            eContext.append('svg:line')
+                .attr('x1', (d) -> d.x)
+                .attr('x2', (d) -> d.x)
+                .attr('y1', '0')
+                .attr('y2', tickHeight)
+                .attr('stroke', getEventBucketColor)
+                .attr('opacity', 0.7)
+            eContext.append('svg:circle')
+                .attr('cx', (d) -> d.x)
+                .attr('cy', '10')
+                .attr('r', '8')
+                .attr('fill', getEventBucketColor)
+                .attr('opacity', 0.7)
+                .on('mousemove', (d) =>
+                        tipDiv = $('<div class="graph-event-tooltip"></div>')
+                        for e in d.events
+                            $('<div>').text(e.caption).appendTo(tipDiv)
+                        ui.Tooltip.show(d3.event, tipDiv)
+                )
+                .on('mouseout', => ui.Tooltip.hide())
+                .on('click', (d) =>
+                        body = $('<div class="graph-event-dialog">')
+                        for e in d.events
+                            eventD = $('<div class="graph-event-dialog-event">')
+                                    .appendTo(body)
+                            $('<div class="graph-event-dialog-event-caption">')
+                                    .text(e.caption)
+                                    .appendTo(eventD)
+                            if e.content?
+                                eventD.append(e.content)
+                            else
+                                eventD.append("(no html metadata)")
+                        new ui.Dialog(body: body)
+                )
 
 
         _drawGraph: (data) ->
