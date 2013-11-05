@@ -69,6 +69,7 @@ define ["cs!lib/ui", "css!aliasEditor"], (ui) ->
                     success: (result) =>
                         if not result.ok
                             onError(result.error)
+                            return
 
                         @dbAliases[next.id] = next.aliases
 

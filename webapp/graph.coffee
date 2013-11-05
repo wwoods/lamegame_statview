@@ -1,6 +1,8 @@
 reqs = [ 'cs!lib/ui', 'cs!stat', 'cs!controls', 'cs!dataset', 'cs!datagroup',
-        'cs!expressionEvaluator', 'cs!alertEvaluator', 'css!graph' ]
-module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
+        'cs!expressionEvaluator', 'cs!alertEvaluator', 'cs!eventEditor', 
+        'css!graph' ]
+module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator,
+        EventEditor) ->
     # d3.scale.category20 does something cool - it returns a method that gives
     # you a color from a rotating list of 20.  What's cool is that it keeps
     # a map of values it has seen before - that is, if we keep a global
@@ -977,6 +979,28 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 bottom: 0
                 left: 0
 
+            # Callback to redraw axis
+            refreshAxis = =>
+                $(axis[0]).remove()
+                @_drawAxis(options)
+
+            # Create event code
+            $(axis[0]).bind 'mousedown', (e) =>
+                myTime = e.pageX - $(axis[0]).offset().left
+                myTime = myTime / width * (xmax - xmin) + xmin
+                canTrigger = [ true ]
+                ui.Tooltip.show(e, $('<div style="color:#888">hold to create new event...</div>'))
+                $(document).one 'mouseup', =>
+                    canTrigger[0] = false
+                    ui.Tooltip.hide()
+                addEvent = =>
+                    if not canTrigger[0]
+                        return
+                    ui.Tooltip.hide()
+                    @_statsController.events.newEvent(myTime, refreshAxis)
+                setTimeout addEvent, 1000
+                return false
+
             axis
                 .attr('width', width).attr('height', tickHeight)
 
@@ -1014,6 +1038,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                 .attr('r', '8')
                 .attr('fill', getEventBucketColor)
                 .attr('opacity', 0.7)
+                .style('cursor', 'pointer')
                 .on('mousemove', (d) =>
                         tipDiv = $('<div class="graph-event-tooltip"></div>')
                         for e in d.events
@@ -1026,14 +1051,26 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator) ->
                         for e in d.events
                             eventD = $('<div class="graph-event-dialog-event">')
                                     .appendTo(body)
+                            eEditor = $('<span class="graph-event-dialog-event-edit">')
+                                    .text('(edit)')
+                                    .bind('click', ((e) => () =>
+                                        dialog.remove()
+                                        new EventEditor e, =>
+                                            if e.delete
+                                                refreshAxis()
+                                    )(e))
                             $('<div class="graph-event-dialog-event-caption">')
                                     .text(e.caption)
+                                    .append(eEditor)
                                     .appendTo(eventD)
                             if e.content?
-                                eventD.append(e.content)
+                                eventD.append($('<div class="graph-event-dialog-event-data">')
+                                        .text(e.content))
                             else
-                                eventD.append("(no html metadata)")
-                        new ui.Dialog(body: body)
+                                eventD.append("(no metadata)")
+                        dialog = new ui.Dialog(body: body)
+                        # Cancel trickle / other behaviors
+                        return false
                 )
 
 

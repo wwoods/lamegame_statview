@@ -1,0 +1,12 @@
+
+.event-editor {
+}
+
+.event-editor-error {
+    color: #f00;
+}
+
+.event-editor textarea {
+    width: 300px;
+    height: 4em;
+}

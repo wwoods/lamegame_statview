@@ -96,7 +96,21 @@
     margin-bottom: 0.5em;
 }
 
+.graph-event-dialog-event-edit {
+    margin-left: 0.1em;
+    color: #0000ff;
+    cursor: pointer;
+}
+
+.graph-event-dialog-event-edit:hover {
+    color: #8080ff;
+}
+
 .graph-event-dialog-event-caption {
     font-weight: bold;
+}
+
+.graph-event-dialog-event-data {
+    white-space: pre-wrap;
 }
 

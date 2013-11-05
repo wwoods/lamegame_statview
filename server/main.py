@@ -197,6 +197,22 @@ class MainRoot(object):
 
     @cherrypy.expose
     @cherrypy.config(**{ 'response.headers.Content-Type': 'application/json' })
+    def saveEvent(self, event):
+        if self._eventStorage is None:
+            return json.dumps(dict(error = "Can't save without storage"))
+
+        e = json.loads(event)
+        if '_id' not in e:
+            raise ValueError("_id not found")
+        if e.get('delete'):
+            self._eventStorage.delete(e['_id'])
+        else:
+            self._eventStorage.save(e)
+        return json.dumps(dict(ok = True))
+
+
+    @cherrypy.expose
+    @cherrypy.config(**{ 'response.headers.Content-Type': 'application/json' })
     def savePath(self, pathDef):
         if self._pathStorage is None:
             return json.dumps(dict(error = "Can't save without storage"))

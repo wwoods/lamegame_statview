@@ -1,5 +1,5 @@
 
-define [ 'cs!lib/ui' ], (ui) ->
+define [ 'cs!lib/ui', 'cs!eventEditor' ], (ui, EventEditor) ->
     class EventsController
         constructor: () ->
             @_minRequested = null
@@ -18,15 +18,15 @@ define [ 'cs!lib/ui' ], (ui) ->
                         + "called first")
             firstI = null
             lastI = @_events.length
+            results = []
             for e, i in @_events
                 if e.time >= timeFrom and e.time <= timeTo
-                    if firstI == null
-                        firstI = i
-                else if firstI != null
-                    lastI = i
+                    if not e.delete
+                        results.push(e)
+                else if e.time > timeTo
                     break
 
-            return @_events.slice(firstI, lastI)
+            return results
 
 
         loadEvents: (timeFrom, timeTo, callback) ->
@@ -90,3 +90,21 @@ define [ 'cs!lib/ui' ], (ui) ->
                             @loadEvents.apply(@, @_pending.shift())
                 }
             )
+
+
+        newEvent: (timeAt, callback) ->
+            # Give user option of making a new event at timeAt, calling callback
+            # if they save.
+
+            event = { time: timeAt }
+            onAdd = =>
+                added = false
+                for v, i in @_events
+                    if timeAt < v.time
+                        @_events.splice(i, 0, event)
+                        added = true
+                        break
+                if not added
+                    @_events.push(event)
+                callback? and callback()
+            new EventEditor(event, onAdd)
