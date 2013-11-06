@@ -155,6 +155,7 @@ class MainRoot(object):
     def getStartup(self):
         """Returns a JSON blob about available stats and dashboards
         """
+        cherrypy.response.timeout = 3600
         stats = self._source.getStats()
         return json.dumps({
             'stats': stats,
