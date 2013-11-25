@@ -134,6 +134,11 @@ define [ 'cs!lib/ui', 'cs!alertEvaluator', 'css!controls' ], (ui) ->
                         @hideNonAlerted.prop('checked',
                                 not @hideNonAlerted.prop('checked'))
 
+            helpDiv = $("<div>Graph Help</div>")
+                    .appendTo(@_content)
+            @helpText = $("<textarea>").appendTo(helpDiv)
+                    .css(height: '5em')
+
             ok = new ui.Base("<input type=\"button\" value=\"Refresh\" />")
             @_content.append ok
 
@@ -189,6 +194,7 @@ define [ 'cs!lib/ui', 'cs!alertEvaluator', 'css!controls' ], (ui) ->
                 smoothOver: @smoother.val()
                 timeAmt: @timeDivAmt.val()
                 autoRefresh: ''
+                helpText: @helpText.val()
             return options
                 
                 
@@ -249,5 +255,6 @@ define [ 'cs!lib/ui', 'cs!alertEvaluator', 'css!controls' ], (ui) ->
             @alert.val(options.alert)
             @smoother.val(options.smoothOver)
             @timeDivAmt.val(options.timeAmt)
+            @helpText.val(options.helpText or '')
             @hideNonAlerted.prop('checked', options.hideNonAlerted)
 

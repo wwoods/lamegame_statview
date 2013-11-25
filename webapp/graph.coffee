@@ -69,7 +69,10 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator,
 
         getTitle: () ->
             """Called when collapsed; when expanded, update() is called."""
-            return @config.title
+            result = $('<span>')
+                    .text(@config.title)
+            @_addHelpTextTo(result)
+            return result
 
 
         parseInterval: (interval, defaultInterval = 60*60) ->
@@ -215,6 +218,18 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator,
                 self._autoRefreshNext = null
 
             self._requestData (dataGroup) => self._drawGraph(dataGroup)
+
+
+        _addHelpTextTo: (dom) ->
+            if not @config.helpText
+                return
+            helpIcon = $('<div class="graph-help-icon">?</div>')
+                    .appendTo(dom)
+            helpIcon.bind 'mouseover' , (e) =>
+                ui.Tooltip.show(e, $('<div class="graph-help-tooltip">')
+                        .text(@config.helpText))
+                helpIcon.one 'mouseout', =>
+                    ui.Tooltip.hide()
 
 
         _requestData: (callback, forAlert = false) ->
@@ -793,6 +808,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator,
             title.text(@config.title)
             if @_missingFilter
                 title.append('<span style="color:#f00;"> missed by filter</span>')
+
+            @_addHelpTextTo(title)
             return title
 
 

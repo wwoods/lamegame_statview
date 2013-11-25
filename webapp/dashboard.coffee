@@ -7,7 +7,7 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             @child = child
             if not child.noCollapse
                 @addClass("collapsed")
-                @inner.text(child.getTitle())
+                @inner.append(child.getTitle())
                 @inner.bind 'click', => @expand()
                 @inner.bind 'mousedown', (e) =>
                     if @hasClass('collapsed') and e.which == 1

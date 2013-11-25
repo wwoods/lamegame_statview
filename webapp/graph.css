@@ -83,6 +83,18 @@
     vertical-align: bottom;
 }
 
+.graph-help-icon {
+    display: inline-block;
+    margin-left: 0.2em;
+    padding: 0 0.25em;
+    background-color: #ddd;
+    border-radius: 0.1em;
+}
+
+.graph-help-tooltip {
+    white-space: pre-wrap;
+}
+
 .graph-event-tooltip {
 }
 
