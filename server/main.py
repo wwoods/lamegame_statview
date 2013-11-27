@@ -222,9 +222,9 @@ page.open('http://127.0.0.1:8080/', //'https://lgstats-sellery.sellerengine.com/
     }
 });
             """.replace("127.0.0.1:8080", ":".join([
-                    cherrypy.app['cherrypy'].get('socket_host',
+                    cherrypy.app['cherrypy'].get('server.socket_host',
                         '127.0.0.1'),
-                    cherrypy.app['cherrypy'].get('socket_port',
+                    cherrypy.app['cherrypy'].get('server.socket_port',
                         '8080') ])))
         tf.file.flush()
 
