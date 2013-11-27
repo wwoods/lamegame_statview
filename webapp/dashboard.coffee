@@ -3,6 +3,21 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
         constructor: (child) ->
             super('<div class="dashboard-cell"></div>')
             @inner = $('<div class="dashboard-cell-inner">').appendTo(@)
+            @handle = $('<div class="dashboard-cell-adjust">').appendTo(@)
+            @handle.bind 'mouseover', (e) =>
+                ui.Tooltip.show(e, $('<div>Resize</div>'))
+                @handle.one 'mouseout', =>
+                    ui.Tooltip.hide()
+            @handle.bind 'mousedown', (e) =>
+                pp = ui.fromDom(@parents('.dashboard'))
+                onMove = (e2) =>
+                    pp.setGraphHeight(e2.pageY - @offset().top)
+                $(document).bind 'mousemove', onMove
+                $(document).one 'mouseup', =>
+                    $(document).unbind 'mousemove'
+                    pp.refresh()
+
+                return false
 
             @child = child
             if not child.noCollapse
@@ -156,6 +171,8 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
                 return
             w = (@width() - 1) / @columns
             h = Math.min(w * @ratio, $(window).height() - @app.header.height())
+            if @app.header.graphHeight?
+                h = @app.header.graphHeight
             if cell.is('.collapsed')
                 h = '1.5em'
             cell.css
@@ -213,6 +230,10 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             return result
 
 
+        getGraphHeight: () ->
+            return ui.fromDom('.stats-header').graphHeight
+
+
         getGraphs: () ->
             # Return a list of all graphs, whether collapsed or not.
             r = []
@@ -253,6 +274,13 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
 
         refresh: () ->
             @container.refresh()
+
+
+        setGraphHeight: (amt) ->
+            sh = ui.fromDom('.stats-header')
+            sh.graphHeight = amt
+            @container.resize()
+            sh.hashUpdate()
             
 
         setTimeAmt: (amt) ->

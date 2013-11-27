@@ -19,6 +19,23 @@
     border-radius: 0.25em;
 }
 
+.dashboard-cell-adjust {
+    display: none;
+    position: absolute;
+    right: 5px;
+    bottom: 3px;
+    width: 16px;
+    height: 5px;
+    background-color: #eee;
+    cursor: s-resize;
+    border: solid 1px #aaa;
+    border-bottom: 0;
+}
+
+.dashboard-cell:first-child .dashboard-cell-adjust {
+    display: inline-block;
+}
+
 .dashboard-cell.collapsed .dashboard-cell-inner {
     padding-left: 1.6em;
     cursor: pointer;

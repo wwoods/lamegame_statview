@@ -62,6 +62,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             @utcDates = false
             @hideNonAlerted = false
             @columns = 2
+            @graphHeight = null
             @autoRefreshInterval = @AUTO_REFRESH_INTERVAL
             @globalFilters = {}
             @globalFilters_doc = "Dict of filters: { group: [ values ] }"
@@ -212,6 +213,8 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                 viewDef.utcDates = true
             if @hideNonAlerted
                 viewDef.hideNonAlerted = true
+            if @graphHeight?
+                viewDef.graphHeight = @graphHeight
             if not @refresh.is(':checked')
                 viewDef.noAutoRefresh = true
             if not $.compareObjs({}, @globalFilters)
@@ -476,6 +479,10 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                         @header.hideNonAlerted = false
                     if obj.columns
                         @header.columns = obj.columns
+                    if obj.graphHeight
+                        @header.graphHeight = obj.graphHeight
+                    else
+                        @header.graphHeight = null
                     if obj.noAutoRefresh
                         @header.refresh.prop("checked", false)
                         @header.autoRefreshInterval = 0
