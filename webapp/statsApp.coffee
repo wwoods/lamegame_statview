@@ -114,7 +114,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             @phantom = $('<a href="javascript:void">phantom</a>')
                 .appendTo(@)
                 .bind "click", =>
-                    window.location.href = "/phantom?q=" + Hash.getHash()
+                    window.location.href = "/phantom?q=" + encodeURIComponent(Hash.getHash())
                     return false
                 
             @pathPicker = new ui.Base(
