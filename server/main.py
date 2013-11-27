@@ -4,6 +4,8 @@ import json
 import os
 import random
 import re
+import subprocess
+import tempfile
 import time
 
 import graphiteSource
@@ -164,6 +166,77 @@ class MainRoot(object):
             'aliases': self._getAliases(),
             'title': self._sourceConfig.get('name', 'LameGame StatView')
         })
+
+
+    @cherrypy.expose
+    def phantom(self, q):
+        """Render an image with phantomjs if it's installed."""
+        if os.system("phantomjs --help") != 0:
+            return "Phantomjs not installed!"
+
+        # NamedTemporaryFile cleans up after itself
+        tf = tempfile.NamedTemporaryFile()
+        tf.file.write("""
+var page = require('webpage').create();
+page.settings.userName = "dev";
+page.settings.password = "parola99933";
+page.viewportSize = {
+    width: 1024,
+    height: 768,
+};
+page.open('http://127.0.0.1:8080/', //'https://lgstats-sellery.sellerengine.com/',
+        function() {
+
+    var step1 = null, step2 = null;
+    page.evaluate(function() {
+        window.location.href = '#{"view":"testdb","timeAmt":"1 day","smoothAmt":"10 minutes","columns":3,"graphHeight":191}';
+    });
+
+    function doStep1() {
+        var isVis = page.evaluate(function() {
+            if (typeof $ === "undefined") {
+                return false;
+            }
+            return $('.dashboard-new').is(':visible');
+        });
+        if (isVis) {
+            clearInterval(step1);
+            page.evaluate(function() {
+                $('.dashboard-cell.collapsed .dashboard-cell-inner')
+                        .click();
+            });
+            step2 = setInterval(doStep2, 500);
+
+        }
+    }
+    step1 = setInterval(doStep1, 500);
+
+    function doStep2() {
+        var isVis = page.evaluate(function() {
+            return $('.load-percent').length === 0;
+        });
+        if (isVis) {
+            console.log(page.renderBase64('png'));
+            phantom.exit();
+        }
+    }
+});
+            """.replace("127.0.0.1:8080", ":".join([
+                    cherrypy.app['cherrypy'].get('socket_host',
+                        '127.0.0.1'),
+                    cherrypy.app['cherrypy'].get('socket_port',
+                        '8080') ])))
+        tf.file.flush()
+
+        sp = subprocess.Popen([ "/usr/bin/phantomjs", tf.name ],
+                stdout = subprocess.PIPE)
+        stdout, stderr = sp.communicate()
+
+        html = """<html><head><title>Phantom Statview</title></head><body>
+            <img src="data:image/png;base64,{}" />
+            </body></html>""".format(stdout)
+
+        return html
 
 
     @cherrypy.expose

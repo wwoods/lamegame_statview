@@ -194,6 +194,8 @@ return {
         }
     },
 
+    getHash: getHash,
+
     go: function (newHash) {
         // Cancel if the new hash is the same as the current one, since there
         // is no cross-browser way to keep track of navigation to the exact

@@ -110,6 +110,12 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                     @app.dashboard.changeColumns(@columns)
                     @hashUpdate()
                 )
+
+            @phantom = $('<a href="javascript:void">phantom</a>')
+                .appendTo(@)
+                .bind "click", =>
+                    window.location.href = "/phantom?q=" + Hash.getHash()
+                    return false
                 
             @pathPicker = new ui.Base(
                     '<input type="submit" value="Add/Edit Stats" 
