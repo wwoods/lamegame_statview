@@ -189,7 +189,7 @@ page.open('http://127.0.0.1:8080/', //'https://lgstats-sellery.sellerengine.com/
 
     var step1 = null, step2 = null;
     page.evaluate(function() {
-        window.location.href = '#{"view":"testdb","timeAmt":"1 day","smoothAmt":"10 minutes","columns":3,"graphHeight":191}';
+        window.location.href = '#HERE_IS_THE_URL_HASH';
     });
 
     function doStep1() {
@@ -225,7 +225,7 @@ page.open('http://127.0.0.1:8080/', //'https://lgstats-sellery.sellerengine.com/
                     cherrypy.app['cherrypy'].get('server.socket_host',
                         '127.0.0.1'),
                     str(cherrypy.app['cherrypy'].get('server.socket_port',
-                        8080)) ])))
+                        8080)) ])).replace("HERE_IS_THE_URL_HASH", q))
         tf.file.flush()
 
         sp = subprocess.Popen([ "/usr/bin/phantomjs", tf.name ],
