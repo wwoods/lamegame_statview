@@ -96,18 +96,26 @@ define ["expressionParser"], (parser) ->
                 # No data, return 0
                 return sv
 
+            # Since we log non-existent stats as NaN, but filters defined in
+            # sLimits should only result in a zero return, not NaN, we need
+            # to keep track of if there could have been any goodValues
+            # separately from if there were goodValues.
+            hadGoodValue = false
             goodValues = []
             for q in @dataSets[s]
-                if not @testLimit(q, sLimits)
-                    continue
                 val = q.values[@dataPoint]
                 if isNaN(val)
+                    continue
+                hadGoodValue = true
+                if not @testLimit(q, sLimits)
                     continue
                 goodValues.push(val)
                 
             if goodValues.length == 0
                 # No values passing filters, return NaN
-                return NaN
+                if not hadGoodValue
+                    return NaN
+                return sv
 
             if stat.type == 'total-max'
                 sv = null
