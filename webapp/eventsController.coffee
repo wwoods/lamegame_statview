@@ -39,7 +39,11 @@ define [ 'cs!lib/ui', 'cs!eventEditor' ], (ui, EventEditor) ->
             if @_minRequested != null
                 if timeTo <= @_maxRequested and timeFrom >= @_minRequested
                     # Overlapping, do nothing
-                    callback()
+                    try
+                        callback()
+                    finally
+                        if @_pending.length > 0
+                            @loadEvents.apply(@, @_pending.shift())
                     return
 
                 timeFrom = Math.min(timeFrom, @_maxRequested)
