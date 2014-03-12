@@ -1,11 +1,13 @@
 
 import cherrypy
+import datetime
+from flexiInt import FlexiInt
 import json
 import os
 import random
-import re
 import subprocess
 import tempfile
+import threading
 import time
 
 import graphiteSource
@@ -33,6 +35,7 @@ class MainRoot(object):
     """Example web server root object for development.
     """
 
+    lock = threading.RLock()
     src = StaticServer(_DIR + '/webapp')
 
     def __init__(self):
@@ -50,7 +53,8 @@ class MainRoot(object):
 
         # Do we have storage?
         for storeType, varShorthand in [ ('dashboards', 'dash'),
-                ('paths', 'path'), ('aliases', 'alias'), ('events', 'event') ]:
+                ('paths', 'path'), ('aliases', 'alias'), ('events', 'event'),
+                ('activities', 'activity') ]:
             store = None
             if cherrypy.app.get('storage', {}).get(storeType) is not None:
                 url = cherrypy.app['storage'][storeType]
@@ -69,6 +73,29 @@ class MainRoot(object):
             setattr(self, varName, store)
 
 
+    def _addActivity(self, origin, type_, data):
+        """Returns the _id of the activity generated, so that clients can ignore
+        it."""
+        if not self._activityStorage:
+            raise Exception("Cannot add activity without storage")
+
+        with self.lock:
+            latest = self._activityStorage.get('~latest')
+            if latest is None:
+                myId = FlexiInt(0).toString()
+                latest = { '_id': '~latest' }
+            else:
+                myId = FlexiInt(FlexiInt(latest['latest']).value + 1).toString()
+            latest['latest'] = myId
+            self._activityStorage.save(latest)
+
+        self._activityStorage.save({ '_id': myId, 'type': type_, 'data': data,
+                'ts': datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S"),
+                'origin': origin
+        })
+        return myId
+
+
     @cherrypy.expose
     def index(self):
         return cherrypy.lib.static.serve_file(_DIR + '/webapp/app.html')
@@ -76,7 +103,7 @@ class MainRoot(object):
 
     @cherrypy.expose
     @cherrypy.config(**{ 'response.headers.Content-Type': 'application/json' })
-    def addEvent(self, event):
+    def addEvent(self, event, origin):
         """Events should have:
         caption - string, shorthand displayed on mouse over
         content - html text when event is opened
@@ -101,17 +128,20 @@ class MainRoot(object):
         eventObject['_id'] = "{}-{}".format(str(eventObject['time']),
                 random.random())
         self._eventStorage.save(eventObject)
-        return json.dumps({ "ok": True, "eventId": eventObject['_id'] })
+        actId = self._addActivity(origin, 'event', eventObject)
+        return json.dumps({ "ok": True, "eventId": eventObject['_id'],
+                "activityId": actId })
     
     
     @cherrypy.expose
     @cherrypy.config(**{ 'response.headers.Content-Type': 'application/json' })
-    def deleteDashboard(self, dashId):
+    def deleteDashboard(self, dashId, origin):
         if self._dashStorage is None:
             return json.dumps(dict(error = "Can't save without storage"))
         
         self._dashStorage.delete(dashId)
-        return json.dumps(dict(ok = True))
+        actId = self._addActivity(origin, 'dash.delete', dashId)
+        return json.dumps(dict(ok = True, activityId = actId))
 
 
     @cherrypy.expose
@@ -122,6 +152,35 @@ class MainRoot(object):
 
         self._pathStorage.delete(pathId)
         return json.dumps(dict(ok = True))
+
+
+    @cherrypy.expose
+    @cherrypy.config(**{ 'response.headers.Content-Type': 'application/json' })
+    def getActivities(self, lastId, origin):
+        """Returns:
+            { lastId: new last id,
+              activities: [ list of activities that come after lastId ]"""
+
+        if self._activityStorage is None:
+            return json.dumps(dict(error = "Can't get activities! Set up "
+                    "storage"))
+
+        # Long-poll
+        s = time.time()
+        while (time.time() - s < 20.0
+                and cherrypy.engine.state != cherrypy.engine.states.STOPPING):
+            if (self._activityStorage.get('~latest', {}).get('latest', lastId)
+                    != lastId):
+                # New activity!  Return that shizzle
+                break
+            time.sleep(0.1)
+
+        acts = list(self._activityStorage.findRange(lastId, '~'))
+        acts = [ a for a in acts if a['_id'] != lastId ]
+        acts.sort(key = lambda m: m['_id'])
+        newLastId = acts[-1]['_id'] if acts else lastId
+        acts = [ a for a in acts if a['origin'] != origin ]
+        return json.dumps({ 'lastId': newLastId, 'activities': acts })
 
 
     @cherrypy.expose
@@ -159,12 +218,15 @@ class MainRoot(object):
         """
         cherrypy.response.timeout = 3600
         stats = self._source.getStats()
+        latestActivity = self._activityStorage.get('~latest')
+        lastActivity = '0' if not latestActivity else latestActivity['latest']
         return json.dumps({
             'stats': stats,
             'paths': self._getPaths(),
             'dashboards': self._getDashboards(),
             'aliases': self._getAliases(),
-            'title': self._sourceConfig.get('name', 'LameGame StatView')
+            'title': self._sourceConfig.get('name', 'LameGame StatView'),
+            'lastActivity': lastActivity,
         })
 
 
@@ -256,22 +318,24 @@ page.open('http://127.0.0.1:8080/', //'https://lgstats-sellery.sellerengine.com/
 
     @cherrypy.expose
     @cherrypy.config(**{ 'response.headers.Content-Type': 'application/json' })
-    def saveDashboard(self, dashDef):
+    def saveDashboard(self, dashDef, origin):
         if self._dashStorage is None:
             return json.dumps(dict(error = "Can't save without storage"))
 
         dd = json.loads(dashDef)
         if 'id' not in dd:
             raise ValueError("id not found")
+        # Save activities with id instead of _id when the type uses it...
+        actId = self._addActivity(origin, 'dash', dd)
         dd['_id'] = dd['id']
         del dd['id']
         self._dashStorage.save(dd)
-        return json.dumps(dict(ok = True))
+        return json.dumps(dict(ok = True, activityId = actId))
 
 
     @cherrypy.expose
     @cherrypy.config(**{ 'response.headers.Content-Type': 'application/json' })
-    def saveEvent(self, event):
+    def saveEvent(self, event, origin):
         if self._eventStorage is None:
             return json.dumps(dict(error = "Can't save without storage"))
 
@@ -280,9 +344,11 @@ page.open('http://127.0.0.1:8080/', //'https://lgstats-sellery.sellerengine.com/
             raise ValueError("_id not found")
         if e.get('delete'):
             self._eventStorage.delete(e['_id'])
+            actId = self._addActivity(origin, 'event.delete', e['_id'])
         else:
             self._eventStorage.save(e)
-        return json.dumps(dict(ok = True))
+            actId = self._addActivity(origin, 'event', e)
+        return json.dumps(dict(ok = True, activityId = actId))
 
 
     @cherrypy.expose

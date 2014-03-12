@@ -112,3 +112,28 @@ define [ 'cs!lib/ui', 'cs!eventEditor' ], (ui, EventEditor) ->
                     @_events.push(event)
                 callback? and callback()
             new EventEditor(event, onAdd)
+
+
+        processActivity: (act) ->
+            if (@_minRequested == null \
+                    or act.data.time < @_minRequested \
+                    or act.data.time > @_maxRequested)
+                # Not yet loaded, get it when we get it
+                return
+
+            if act.type == "event"
+                inserted = false
+                for e, i in @_events
+                    if e.time >= act.data.time
+                        inserted = true
+                        @_events.splice(i, 0, act.data)
+                        break
+                if not inserted
+                    @_events.push(act.data)
+            else if act.type == "event.delete"
+                for e in @_events
+                    if e._id == act.data
+                        e.delete = true
+                        break
+            else
+                throw new Error("Unrecognized activity type: #{ act.type }")

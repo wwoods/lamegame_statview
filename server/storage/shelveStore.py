@@ -10,8 +10,8 @@ class ShelveCollection(BaseCollection):
         self._shelf = shelve.open(fname)
         
         
-    def delete(self, id):
-        key = self._getKey(id)
+    def delete(self, _id):
+        key = self._getKey(_id)
         del self._shelf[key]
         self._shelf.sync()
         
@@ -25,6 +25,10 @@ class ShelveCollection(BaseCollection):
         for k, v in self._shelf.iteritems():
             if a <= k < b:
                 yield v
+
+
+    def get(self, _id, default = None):
+        return self._shelf.get(self._getKey(_id), default)
     
     
     def save(self, doc):

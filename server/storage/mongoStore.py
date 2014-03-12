@@ -23,8 +23,8 @@ class MongoCollection(BaseCollection):
         self._coll = self._conn[db[1:]][coll[1:]]
         
         
-    def delete(self, id):
-        self._coll.remove({ '_id': id })
+    def delete(self, _id):
+        self._coll.remove({ '_id': _id })
     
         
     def find(self):
@@ -34,6 +34,13 @@ class MongoCollection(BaseCollection):
     def findRange(self, a, b):
         """Returns an iterator of all documents between [a, b), exclusive"""
         return self._coll.find({ '_id': { '$gte': a, '$lt': b } })
+
+
+    def get(self, _id, default = None):
+        r = self._coll.find_one(_id)
+        if r is None:
+            r = default
+        return r
     
     
     def save(self, doc):

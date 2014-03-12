@@ -16,6 +16,12 @@ class BaseCollection(object):
     def findRange(self, a, b):
         """Returns an iterator of all documents between [a, b), exclusive"""
         raise NotImplementedError()
+
+
+    def get(self, _id, default = None):
+        """Returns the document with the given id, or None if there isn't one.
+        """
+        raise NotImplementedError()
         
     
     def save(self, doc):

@@ -172,6 +172,41 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             @app.alertsChanged()
             ui.setZeroTimeout () =>
                 @hashUpdate()
+
+
+        dashUpdated: (id, definition) ->
+            ### A dashboard was updated remotely (deleted if definition == null)
+            ###
+            if id == @picker.val() or id == @namer.val()
+                @app.dashboard.setSavedDefinition(definition or {})
+                @needsSave()
+
+                if @picker.val() == "(unsaved)" and definition?
+                    @namer.val(@namer.val() + " - #{ @app.originCode }")
+                    new ui.Dialog(body: "Someone else saved this dashboard that
+                            you were apparently working on!  To prevent a
+                            conflict, your dashboard has been renamed.  You will
+                            have to manually merge changes at some point if you
+                            save")
+
+            if not definition?
+                # Delete!
+                @picker.remove(id)
+                for d, i in @dashboards
+                    if d.id == id
+                        @dashboards.splice(i, 1)
+                        break
+            else
+                # Update
+                inserted = false
+                for d, i in @dashboards
+                    if d.id == id
+                        @dashboards[i] = definition
+                        inserted = true
+                        break
+                if not inserted
+                    @dashboards.push(definition)
+                    @picker.addOption(definition.id)
                 
                 
         deleteDash: () ->
@@ -198,6 +233,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                 url: 'deleteDashboard'
                 data:
                     dashId: dashId
+                    origin: @app.originCode
                 success: (result) =>
                     if not result.ok
                         return onError(result)
@@ -310,6 +346,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                 url: 'saveDashboard'
                 data:
                     dashDef: JSON.stringify(newDef)
+                    origin: @app.originCode
                 success: (result) =>
                     if not result.ok
                         return onError(result)
@@ -348,6 +385,16 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
             super('<div class="stats-app"></div>')
             self = @
             @siteTitle = document.title
+            # Thank you, http://stackoverflow.com/questions/105034/how-to-create-a-guid-uuid-in-javascript
+            @originCode = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(
+                /[xy]/g, (c) ->
+                    r = Math.random()*16|0
+                    if c == 'x'
+                        v = r
+                    else
+                        v = (r&0x3|0x8)
+                    return v.toString(16)
+            )
             window.debug = false
 
             @alertsDisplay = new AlertsDisplay()
@@ -366,6 +413,8 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                         @_aliases = data.aliases
                         @_statsController.parseStats(@_paths)
                         @_statsController.setAliases(@_aliases)
+                        @_lastActivity = data.lastActivity
+                        @_listenForActivities()
                         console.log(@_statsController)
                         window.sc = @_statsController
 
@@ -448,6 +497,45 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                 
         setTitle: (title) ->
             document.title = title + ' - ' + @siteTitle
+
+
+        _listenForActivities: () ->
+            ### Listen for activities after @_lastActivity
+            ###
+            $.ajax('getActivities', {
+                type: 'POST'
+                data: { lastId: @_lastActivity, origin: @originCode }
+                success: (data) =>
+                    @_lastActivity = data.lastId
+                    setTimeout(
+                        => @_listenForActivities()
+                        1000)
+                    for act in data.activities
+                        try
+                            if act.type == "event" or act.type == "event.delete"
+                                @_statsController.events.processActivity(act)
+                                # Something changed; refresh graphs if
+                                # autorefresh is on
+                                if @header.autoRefreshInterval != 0
+                                    @dashboard.refresh()
+
+                            else if act.type == "dash"
+                                @header.dashUpdated(act.data.id, act.data)
+                            else if act.type == "dash.delete"
+                                @header.dashUpdated(act.data, null)
+                            else
+                                console.log("Activity:")
+                                console.log(act)
+                                new ui.Dialog(
+                                        body: "Bad activity type: #{ act.type }"
+                                )
+                        catch e
+                            new ui.Dialog(body: e.toString())
+                error: =>
+                    setTimeout(
+                        => @_listenForActivities()
+                        1000)
+            })
                     
                     
         _onHashChange: (hash, isFirst) ->

@@ -48,10 +48,11 @@ define [ 'cs!lib/ui', 'css!eventEditor' ], (ui) ->
                 @saveStatus.text("FAILED: #{ e and e.message or e }")
 
             targetUrl = @event._id? and 'saveEvent' or 'addEvent'
+            originCode = ui.fromDom($('.stats-app')).originCode
             $.ajax
                 type: 'POST'
                 url: targetUrl
-                data: { event: JSON.stringify(@event) }
+                data: { event: JSON.stringify(@event), origin: originCode }
                 error: onError
                 success: (result) =>
                     if not result.ok
