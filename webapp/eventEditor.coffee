@@ -59,5 +59,6 @@ define [ 'cs!lib/ui', 'css!eventEditor' ], (ui) ->
                         onError(result.error)
                         return
 
+                    @event._id = result.eventId
                     @remove()
                     @saveCallback? and @saveCallback()
