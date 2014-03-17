@@ -25,20 +25,7 @@ import subprocess
 import sys
 
 from server.main import MainRoot, StaticServer, _DIR
-
-def mergeConfig(self, *args, **kwargs):
-    """Augment cherrypy.lib.reprconf.Config with a method that merges top-level
-    dicts into each other, so that app_local.ini can specify a minor subset
-    of options and still get defaults from app.ini.
-    """
-    other = cherrypy.lib.reprconf.Config(*args, **kwargs)
-    # Top-level keys are namespaces to merge, second level should get replaced
-    for k, v in other.items():
-        mergeFrom = self.get(k, {})
-        mergeFrom.update(v)
-        self[k] = mergeFrom
-cherrypy.lib.reprconf.Config.merge = mergeConfig
-
+from server.util import Config
 
 def getLatestSource():
     """Return the latest timestamp for files that go into the source of this
@@ -120,7 +107,7 @@ def tryBuild():
 if __name__ == '__main__':
     # Support an app.ini file, as well as an app_local.ini for 
     # configuration of this specific deployment of the app
-    appConfig = cherrypy.lib.reprconf.Config()
+    appConfig = Config()
     baseConfig = os.path.join(_DIR, 'app.ini')
     if os.path.isfile(baseConfig):
         # This app has a default configuration

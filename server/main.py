@@ -13,6 +13,9 @@ import time
 import graphiteSource
 import lgTaskSource
 
+# http://stackoverflow.com/questions/2427240/thread-safe-equivalent-to-pythons-time-strptime
+datetime.datetime.strptime("2013-03-18T01:23:45", "%Y-%m-%dT%H:%M:%S")
+
 _DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _DIR_doc = """Project dir"""
 
@@ -34,6 +37,9 @@ class StaticServer(object):
 class MainRoot(object):
     """Example web server root object for development.
     """
+
+    AUDIT_INTERVAL = 300.0
+    AUDIT_INTERVAL_doc = """Every X seconds, clean out old data"""
 
     lock = threading.RLock()
     src = StaticServer(_DIR + '/webapp')
@@ -80,6 +86,9 @@ class MainRoot(object):
             raise Exception("Cannot add activity without storage")
 
         with self.lock:
+            # Clean out old activities, maybe
+            self._auditActivities()
+
             latest = self._activityStorage.get('~latest')
             if latest is None:
                 myId = FlexiInt(0).toString()
@@ -90,10 +99,32 @@ class MainRoot(object):
             self._activityStorage.save(latest)
 
         self._activityStorage.save({ '_id': myId, 'type': type_, 'data': data,
-                'ts': datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S"),
+                'ts': self.tsFormat(datetime.datetime.utcnow()),
                 'origin': origin
         })
         return myId
+
+
+    def _auditActivities(self):
+        """Once every AUDIT_INTERVAL, see if there are any old activities and
+        clean them out.  Note that we have self.lock when called."""
+        old = getattr(self, '_auditActivities_timer', None)
+        if old is not None and time.time() - old < self.AUDIT_INTERVAL:
+            return
+        self._auditActivities_timer = time.time()
+
+        cutoff = datetime.datetime.utcnow() - datetime.timedelta(days = 7)
+        toDelete = []
+        for d in self._activityStorage.find():
+            if '~latest' == d['_id']:
+                # Never audit the state placeholder
+                continue
+
+            if 'ts' not in d or self.tsRead(d['ts']) <= cutoff:
+                toDelete.append(d['_id'])
+
+        for d in toDelete:
+            self._activityStorage.delete(d)
 
 
     @cherrypy.expose
@@ -378,6 +409,16 @@ page.open('http://127.0.0.1:8080/', //'https://lgstats-sellery.sellerengine.com/
             self._aliasStorage.save(dd)
 
         return json.dumps(dict(ok = True))
+
+
+    @classmethod
+    def tsFormat(cls, d):
+        return d.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+    @classmethod
+    def tsRead(cls, d):
+        return datetime.datetime.strptime(d, "%Y-%m-%dT%H:%M:%S")
 
 
     def _getAliases(self):
