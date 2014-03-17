@@ -170,6 +170,13 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator,
             return statsFound
 
 
+        refreshAxis: () ->
+            ### Call to redraw the axis labeling.  This method is overwritten
+            in _drawGraph
+            ###
+            true
+
+
         remove: () ->
             ### Remove this graph and clean up all of its dependency cycles.
             ###
@@ -997,7 +1004,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator,
                 left: 0
 
             # Callback to redraw axis
-            refreshAxis = =>
+            @refreshAxis = =>
                 $(axis[0]).remove()
                 @_drawAxis(options)
 
@@ -1014,7 +1021,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator,
                     if not canTrigger[0]
                         return
                     ui.Tooltip.hide()
-                    @_statsController.events.newEvent(myTime, refreshAxis)
+                    @_statsController.events.newEvent(myTime, @refreshAxis)
                 setTimeout addEvent, 1000
                 return false
 
@@ -1074,7 +1081,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator,
                                         dialog.remove()
                                         new EventEditor e, =>
                                             if e.delete
-                                                refreshAxis()
+                                                @refreshAxis()
                                     )(e))
                             $('<div class="graph-event-dialog-event-caption">')
                                     .text(e.caption)

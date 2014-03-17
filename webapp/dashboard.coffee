@@ -104,7 +104,6 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
                 @_createNew = @append(@_createNew)
 
                 if definition?
-                    console.log(definition)
                     for config in definition.graphs
                         @append(new Graph(config, @dashboard))
                     @dashboard.setTimeAmtIfBlank(definition.timeAmt)
@@ -145,14 +144,17 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             return cell
 
 
-        refresh: () ->
+        refresh: (axesOnly = false) ->
             # Refresh all graphs
             for cell in @children()
                 # Only refresh visible graphs - that means they must be the
                 # 2nd-level child of the cell.
                 graph = ui.fromDom($(cell).children().children())
                 if graph instanceof Graph
-                    graph.update()
+                    if not axesOnly
+                        graph.update()
+                    else
+                        graph.refreshAxis()
 
 
         resize: () ->
@@ -272,8 +274,8 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             return ui.fromDom('.stats-header').utcDates
 
 
-        refresh: () ->
-            @container.refresh()
+        refresh: (axesOnly = false) ->
+            @container.refresh(axesOnly)
 
 
         setGraphHeight: (amt) ->

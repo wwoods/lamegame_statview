@@ -517,7 +517,7 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                                 # Something changed; refresh graphs if
                                 # autorefresh is on
                                 if @header.autoRefreshInterval != 0
-                                    @dashboard.refresh()
+                                    @dashboard.refresh(true)
 
                             else if act.type == "dash"
                                 @header.dashUpdated(act.data.id, act.data)
