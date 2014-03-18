@@ -1075,6 +1075,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator,
                         for e in d.events
                             eventD = $('<div class="graph-event-dialog-event">')
                                     .appendTo(body)
+                            tags = $('<div class="graph-event-dialog-types">')
+                                    .text(e.types.join(', '))
                             eEditor = $('<span class="graph-event-dialog-event-edit">')
                                     .text('(edit)')
                                     .bind('click', ((e) => () =>
@@ -1085,6 +1087,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator,
                                     )(e))
                             $('<div class="graph-event-dialog-event-caption">')
                                     .text(e.caption)
+                                    .append(tags)
                                     .append(eEditor)
                                     .appendTo(eventD)
                             if e.content?

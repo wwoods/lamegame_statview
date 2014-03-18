@@ -134,12 +134,20 @@ class MainRoot(object):
 
     @cherrypy.expose
     @cherrypy.config(**{ 'response.headers.Content-Type': 'application/json' })
-    def addEvent(self, event, origin):
+    def addEvent(self, event, origin = None):
         """Events should have:
         caption - string, shorthand displayed on mouse over
         content - html text when event is opened
         time - Time, in seconds (including decimal milliseconds) of event.  If
                 not supplied, server's now() time will be used.
+
+        Events may have:
+        types - list of string, identifier(s) for filtering events.
+                Default value is ["user"] if not specified.
+
+        'origin' is passed by browser to prevent seeing this event as an
+                activity.  For events, this field is optional, and should be
+                omitted when used as an API call (outside the app).
         """
         if self._eventStorage is None:
             return json.dumps(dict(error = "Can't save without event storage"))
@@ -152,6 +160,16 @@ class MainRoot(object):
             eventObject['content'] = None
         if 'time' not in eventObject:
             eventObject['time'] = time.time()
+        if 'types' in eventObject:
+            if not isinstance(eventObject['types'], list):
+                errors.append("types must be a list of strings!")
+            if not eventObject['types']:
+                errors.append("types must have at least one member!")
+            for t in eventObject['types']:
+                if not isinstance(t, basestring):
+                    errors.append("types must be a list of strings!")
+        else:
+            eventObject['types'] = [ "user" ]
         if errors:
             return json.dumps(dict(error = ', '.join(errors)))
         # as of 2013-10-31, the seconds column for time is 10 digits long.  It
@@ -379,7 +397,8 @@ page.open('http://127.0.0.1:8080/', //'https://lgstats-sellery.sellerengine.com/
         else:
             self._eventStorage.save(e)
             actId = self._addActivity(origin, 'event', e)
-        return json.dumps(dict(ok = True, activityId = actId))
+        return json.dumps(dict(ok = True, activityId = actId,
+                eventId = e['_id']))
 
 
     @cherrypy.expose

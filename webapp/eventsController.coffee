@@ -7,6 +7,19 @@ define [ 'cs!lib/ui', 'cs!eventEditor' ], (ui, EventEditor) ->
             @_events = []
             @_pending = []
             @_inRequest = false
+            # user is always a type
+            @_types = { user: true }
+
+            # Seed our types values from events in the last week
+            now = Date.now() / 1000
+            @loadEvents(now - 7 * 86400, now)
+
+
+        addType: (t) ->
+            # Registers a new filter type.  Returns true if it wasn't in there
+            isNew = t of @_types
+            @_types[t] = true
+            return isNew
 
 
         getEvents: (timeFrom, timeTo) ->
@@ -29,6 +42,16 @@ define [ 'cs!lib/ui', 'cs!eventEditor' ], (ui, EventEditor) ->
             return results
 
 
+        getTypes: () ->
+            # Returns a sorted list of event types to display, based on loaded
+            # events.
+            r = []
+            for t of @_types
+                r.push(t)
+            r.sort (a, b) -> a.toLowerCase().localeCompare(b.toLowerCase())
+            return r
+
+
         loadEvents: (timeFrom, timeTo, callback) ->
             if @_inRequest
                 @_pending.push([ timeFrom, timeTo, callback ])
@@ -40,7 +63,7 @@ define [ 'cs!lib/ui', 'cs!eventEditor' ], (ui, EventEditor) ->
                 if timeTo <= @_maxRequested and timeFrom >= @_minRequested
                     # Overlapping, do nothing
                     try
-                        callback()
+                        callback? and callback()
                     finally
                         if @_pending.length > 0
                             @loadEvents.apply(@, @_pending.shift())
@@ -79,6 +102,12 @@ define [ 'cs!lib/ui', 'cs!eventEditor' ], (ui, EventEditor) ->
                             )
                             return
 
+                        for e in data.events
+                            if not e.types? or e.types.length == 0
+                                # Old data; instantiate types to its default
+                                e.types = [ 'user' ]
+                            @_registerTypes(e.types)
+
                         if replace
                             @_events = data.events
                         else if append
@@ -86,7 +115,7 @@ define [ 'cs!lib/ui', 'cs!eventEditor' ], (ui, EventEditor) ->
                         else
                             @_events = data.events.concat(@_events)
 
-                        callback()
+                        callback? and callback()
 
                     complete: () =>
                         @_inRequest = false
@@ -137,3 +166,8 @@ define [ 'cs!lib/ui', 'cs!eventEditor' ], (ui, EventEditor) ->
                         break
             else
                 throw new Error("Unrecognized activity type: #{ act.type }")
+
+
+        _registerTypes: (types) ->
+            for t in types
+                @_types[t] = true

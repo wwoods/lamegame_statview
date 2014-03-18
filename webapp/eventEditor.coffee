@@ -1,6 +1,7 @@
 define [ 'cs!lib/ui', 'css!eventEditor' ], (ui) ->
     class EventEditor extends ui.Dialog
         constructor: (event, saveCallback) ->
+            @controller = ui.fromDom($('.stats-app'))._statsController.events
             @event = event
             @saveCallback = saveCallback
             if not @event.caption?
@@ -11,6 +12,53 @@ define [ 'cs!lib/ui', 'css!eventEditor' ], (ui) ->
             @editCaption = $('<input type="text">')
                     .val(event.caption)
                     .appendTo(trow)
+
+            @editTypes = new ui.ListBox(multiple: true)
+                .appendTo(trow)
+            for val in @controller.getTypes()
+                @editTypes.addOption(val)
+            @editTypes.val(event.types)
+            @editTypes.multiselect(
+                    selectedText: (checked, total) =>
+                        vals = @editTypes.val()
+                        caption = []
+                        for v, i in vals
+                            if i >= 3
+                                caption.push("...#{ vals.length - i } more")
+                                break
+                            caption.push(v)
+
+                        return caption.join(", ")
+                    noneSelectedText: "user"
+                )
+                .multiselectfilter()
+
+            @addType = $('<input type="button">')
+                    .val("Add filter...")
+                    .appendTo(trow)
+                    .bind 'click', =>
+                        input = $('<input type="text">')
+                                .bind 'keydown', (e) =>
+                                    if e.which == 13
+                                        ok.trigger('click')
+                        ok = $('<input type="button" value="ok">')
+                        ok.bind 'click', =>
+                            newType = input.val()
+                            if newType.length > 0
+                                if not @controller.addType(newType)
+                                    @editTypes.addOption(newType)
+                                # Select new option, then refresh
+                                curVal = @editTypes.val() or []
+                                curVal.push(newType)
+                                @editTypes.val(curVal)
+                                # Refresh the list of options and select new
+                                @editTypes.multiselect("refresh")
+                                d.remove()
+                        d = new ui.Dialog(body: $('<div>')
+                                .append("New event type (will be saved when "
+                                    "event is saved)")
+                                .append(input)
+                                .append(ok))
 
             @editBody = $('<textarea>')
                     .val(event.content or "")
@@ -37,6 +85,7 @@ define [ 'cs!lib/ui', 'css!eventEditor' ], (ui) ->
             @event.content = @editBody.val()
             if @event.content.trim().length == 0
                 @event.content = null
+            @event.types = @editTypes.val() or [ "user" ]
 
             if @shouldDelete.is(':checked')
                 @event.delete = true
