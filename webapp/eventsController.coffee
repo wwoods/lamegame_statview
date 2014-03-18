@@ -86,11 +86,11 @@ define [ 'cs!lib/ui', 'cs!eventEditor' ], (ui, EventEditor) ->
                 else if @_maxRequested >= timeTo
                     timeTo = @_minRequested
 
-                @_maxRequested = Math.max(@_maxRequested, timeTo)
-                @_minRequested = Math.min(@_minRequested, timeFrom)
-
                 if timeTo <= @_maxRequested
                     append = false
+
+                @_maxRequested = Math.max(@_maxRequested, timeTo)
+                @_minRequested = Math.min(@_minRequested, timeFrom)
             else
                 @_minRequested = timeFrom
                 @_maxRequested = timeTo
@@ -115,6 +115,7 @@ define [ 'cs!lib/ui', 'cs!eventEditor' ], (ui, EventEditor) ->
                                 e.types = [ 'user' ]
                             @_registerTypes(e.types)
 
+                        console.log("append: #{ append }")
                         if replace
                             @_events = data.events
                         else if append
@@ -166,6 +167,8 @@ define [ 'cs!lib/ui', 'cs!eventEditor' ], (ui, EventEditor) ->
                         break
                 if not inserted
                     @_events.push(act.data)
+
+                @_registerTypes(act.data.types or [])
             else if act.type == "event.delete"
                 for e in @_events
                     if e._id == act.data

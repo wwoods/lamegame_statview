@@ -130,6 +130,9 @@ define ["cs!lib/ui", "css!optionsEditor"], (ui) ->
             @optionsHolder.utcDates = @utcDates.is(':checked')
             @optionsHolder.hideNonAlerted = @hideNonAlerted.is(':checked')
             @optionsHolder.eventTypesFilter = @eventFilter.val() or []
+            if @optionsHolder.eventTypesFilter.length == @statsController.events.getTypes().length
+                # Prefer the non-discriminatory empty list
+                @optionsHolder.eventTypesFilter = []
             @_refreshFilters()
             newSettings =
                 filters: @filters

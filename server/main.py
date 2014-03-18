@@ -154,13 +154,14 @@ class MainRoot(object):
 
         eventObject = json.loads(event)
         errors = []
-        if 'caption' not in eventObject:
+        fields = dict(eventObject)
+        if fields.pop('caption', None) is None:
             errors.append("Needs caption")
-        if 'content' not in eventObject:
+        if fields.pop('content', None) is None:
             eventObject['content'] = None
-        if 'time' not in eventObject:
+        if fields.pop('time', None) is None:
             eventObject['time'] = time.time()
-        if 'types' in eventObject:
+        if fields.pop('types', None) is not None:
             if not isinstance(eventObject['types'], list):
                 errors.append("types must be a list of strings!")
             if not eventObject['types']:
@@ -170,6 +171,10 @@ class MainRoot(object):
                     errors.append("types must be a list of strings!")
         else:
             eventObject['types'] = [ "user" ]
+
+        if fields:
+            errors.append("Unrecognized fields: {}".format(fields.keys()))
+
         if errors:
             return json.dumps(dict(error = ', '.join(errors)))
         # as of 2013-10-31, the seconds column for time is 10 digits long.  It
