@@ -10,7 +10,7 @@ define ["cs!lib/ui", "css!optionsEditor"], (ui) ->
             @groupLabel = new ui.Base('<td></td>')
                 .text(group)
                 .appendTo(@)
-                
+
             @values = new ui.ListBox(multiple: true)
                 .appendTo($('<td></td>').appendTo(@))
             for val in @sc.groups[@group]
@@ -72,6 +72,22 @@ define ["cs!lib/ui", "css!optionsEditor"], (ui) ->
             allGroups.sort()
             for g in allGroups
                 @filterRows.append(new FilterRow(g, @))
+
+            body.append('<div class="header">Event Types</div>')
+            @eventFilter = new ui.ListBox(multiple: true)
+                    .appendTo(body)
+            for val in @statsController.events.getTypes()
+                @eventFilter.addOption(val)
+            @eventFilter.val(@optionsHolder.eventTypesFilter or [])
+            @eventFilter.multiselect(
+                    selectedText: (checked, total) =>
+                        if checked == total
+                            return "Displaying all events"
+                        else
+                            return "Displaying #{ checked } of #{ total }
+                                    event types"
+                    noneSelectedText: "Displaying all events"
+                ).multiselectfilter()
                 
             body.append('<div class="header">Misc Options</div>')
             sanDiv = $('<div></div>').appendTo(body)
@@ -113,12 +129,14 @@ define ["cs!lib/ui", "css!optionsEditor"], (ui) ->
             @optionsHolder.sanitize = @sanitizer.is(':checked')
             @optionsHolder.utcDates = @utcDates.is(':checked')
             @optionsHolder.hideNonAlerted = @hideNonAlerted.is(':checked')
+            @optionsHolder.eventTypesFilter = @eventFilter.val() or []
             @_refreshFilters()
             newSettings =
                 filters: @filters
                 sanitize: @optionsHolder.sanitize
                 utcDates: @optionsHolder.utcDates
                 hideNonAlerted: @optionsHolder.hideNonAlerted
+                eventTypes: @optionsHolder.eventTypesFilter
             if not $.compareObjs(newSettings, @_initSettings)
                 if @options.onChange?
                     @options.onChange()

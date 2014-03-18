@@ -85,6 +85,16 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                         else
                             desc = "#{ vals.length } #{ g }s"
                         html += "<br />&nbsp;&nbsp;&nbsp;&nbsp;#{ desc }"
+                    if @eventTypesFilter and @eventTypesFilter.length > 0
+                        etypes = []
+                        for et, i in @eventTypesFilter
+                            if i >= 3
+                                etypes.push("...and #{ @eventTypesFilter.length\
+                                        - i } more")
+                                break
+                            etypes.push(et)
+                        html += "<br />Showing #{ etypes.join(', ') } event " \
+                                + "types"
                     ui.Tooltip.show(e, html)
                 )
                 .bind("mouseout", () => ui.Tooltip.hide())
@@ -261,6 +271,8 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                 viewDef.noAutoRefresh = true
             if not $.compareObjs({}, @globalFilters)
                 viewDef.filters = @globalFilters
+            if @eventTypesFilter and @eventTypesFilter.length != 0
+                viewDef.eventTypes = @eventTypesFilter
             Hash.update(JSON.stringify(viewDef))
                 
                 
@@ -559,6 +571,10 @@ callback = (ui, StatsController, Dashboard, StatPathEditor, OptionsEditor,
                         @header.globalFilters = obj.filters
                     else
                         @header.globalFilters = {}
+                    if obj.eventTypes?
+                        @header.eventTypesFilter = obj.eventTypes
+                    else
+                        @header.eventTypesFilter = []
                     if obj.sanitize
                         @header.sanitize = true
                     else

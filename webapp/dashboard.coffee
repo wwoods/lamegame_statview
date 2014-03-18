@@ -232,6 +232,10 @@ define [ 'cs!lib/ui', 'cs!graph', 'css!dashboard' ], (ui, Graph) ->
             return result
 
 
+        getEventTypesFilter: () ->
+            return ui.fromDom('.stats-header').eventTypesFilter
+
+
         getGraphHeight: () ->
             return ui.fromDom('.stats-header').graphHeight
 

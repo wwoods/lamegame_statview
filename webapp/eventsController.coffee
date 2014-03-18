@@ -22,7 +22,7 @@ define [ 'cs!lib/ui', 'cs!eventEditor' ], (ui, EventEditor) ->
             return isNew
 
 
-        getEvents: (timeFrom, timeTo) ->
+        getEvents: (timeFrom, timeTo, typeFilter = null) ->
             # Returns a sorted list of events between the two times given.
             # Throws an error if loadEvents() hasn't been called with
             if timeFrom >= @_maxRequested or timeTo < @_minRequested
@@ -34,7 +34,14 @@ define [ 'cs!lib/ui', 'cs!eventEditor' ], (ui, EventEditor) ->
             results = []
             for e, i in @_events
                 if e.time >= timeFrom and e.time <= timeTo
-                    if not e.delete
+                    isOk = not e.delete
+                    if isOk and typeFilter? and typeFilter.length > 0
+                        isOk = false
+                        for t in typeFilter
+                            if t in e.types
+                                isOk = true
+                                break
+                    if isOk
                         results.push(e)
                 else if e.time > timeTo
                     break

@@ -864,7 +864,8 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator,
             ticks = width / 40
             eventRadius = 8
 
-            events = @_statsController.events.getEvents(xmin, xmax)
+            events = @_statsController.events.getEvents(xmin, xmax, 
+                    @dashboard.getEventTypesFilter())
             eventBuckets = @_bucketizeEvents(events, xmin, xmax, width,
                     eventRadius)
 
