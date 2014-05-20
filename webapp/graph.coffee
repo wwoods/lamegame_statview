@@ -2012,7 +2012,7 @@ module = (ui, Stat, Controls, DataSet, DataGroup, evaler, AlertEvaluator,
                         if not (nextValue of dataOutput.subgroups)
                             nextTitle = "#{ next[0] }: #{ nextValue }"
                             dataOutput.subgroups[nextValue] = new DataGroup(
-                                    nextTitle, calculateOptions)
+                                    nextTitle, calculateOptions, dataOutput)
                         dataOutput = dataOutput.subgroups[nextValue]
                     
             if window.debug

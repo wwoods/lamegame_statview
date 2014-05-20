@@ -52,6 +52,9 @@ define ["expressionParser"], (parser) ->
             dataSets - actually a dataGroup's values member
             ###
             @dataSets = dataSets
+            if window.debug
+                console.log "@dataSets:"
+                console.log @dataSets
             @dataPoint = 0
             @statsController = statsController
             @exprTree = exprTree

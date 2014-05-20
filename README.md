@@ -81,4 +81,11 @@ And smooth that over an hour.  The "for each" clause ensures that the 100
 is applied once per user, and not once to the sum of all actions completed
 by all users.
 
+min(a, b) and max(a, b) are also provided.
+
+
+## Changes
+
+* 2014-5-19 - fixing an issue with combining two stats that are associated
+  with different sets of groups.
 
